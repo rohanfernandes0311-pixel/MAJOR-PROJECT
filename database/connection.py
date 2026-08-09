@@ -19,9 +19,8 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "sqlite:///./data/local_store.db"
+    "sqlite:///./data/landsense_unified.db"
 )
-
 
 # SQLite requires this option when used with FastAPI
 # because multiple requests may use the database connection.
