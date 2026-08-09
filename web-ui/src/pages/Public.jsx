@@ -11,11 +11,10 @@ import {
   loadOfflineEmergencyAlert,
   persistOfflineEmergencyAlert
 } from '../shared/offlineEmergencyAlertStore'
-import { getStoredAuth } from '../auth/authClient'
+import { apiFetch, getStoredAuth } from '../auth/authClient'
 
 const FALLBACK_LOCATION = { lat: 18.55, lng: 73.9 }
 const API_BASE = window.location.origin
-
 const STORAGE = {
   uid: 'landsense_uid',
   alerts: 'landsense_alerts_enabled',
@@ -119,21 +118,7 @@ function getOrCreateUid() {
 }
 
 async function fetchJson(path, options = {}) {
-  const token = getStoredAuth().token
-  const resp = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    ...options
-  })
-  if (!resp.ok) {
-    const txt = await resp.text()
-    const err = new Error(txt || 'Request failed')
-    err.status = resp.status
-    throw err
-  }
-  return resp.json()
+  return apiFetch(path, options, getStoredAuth().token)
 }
 
 function riskBodyText(uiRisk) {
@@ -228,12 +213,12 @@ export default function Public() {
             end_longitude: primaryZoneCenter[1]
           })
         })
-        const points = Array.isArray(routeResp?.route) ? routeResp.route : []
+        const points = Array.isArray(routeResp?.path) ? routeResp.path : []
         if (points.length >= 2) {
-          const start = [Number(points[0].lat), Number(points[0].lon)]
+          const start = [Number(points[0].latitude), Number(points[0].longitude)]
           const endPoint = points[points.length - 1]
-          const end = [Number(endPoint.lat), Number(endPoint.lon)]
-          setRoute({ start, end })
+          const end = [Number(endPoint.latitude), Number(endPoint.longitude)]
+          setRoute({ path: points.map((point) => [Number(point.latitude), Number(point.longitude)]), start, end })
           return
         }
       }
@@ -264,27 +249,19 @@ export default function Public() {
   )
 
   const tryPredict = useCallback(async (lat, lng) => {
-    const minimal = { latitude: lat, longitude: lng }
-    try {
-      return await fetchJson('/predict', { method: 'POST', body: JSON.stringify(minimal) })
-    } catch (err) {
-      if (err && (err.status === 404 || err.status === 405 || err.status === 422)) {
-        const fallback = {
-          latitude: lat,
-          longitude: lng,
-          deformation_mm: 5.0,
-          velocity_mm_yr: 12.0,
-          coherence: 0.8,
-          slope_deg: 24.0,
-          soil_moisture_pct: 45.0,
-          elevation_m: 900.0,
-          ndvi: 0.4,
-          model: 'ensemble'
-        }
-        return await fetchJson('/predict-risk', { method: 'POST', body: JSON.stringify(fallback) })
-      }
-      throw err
+    const payload = {
+      latitude: lat,
+      longitude: lng,
+      deformation_mm: 5.0,
+      velocity_mm_yr: 12.0,
+      coherence: 0.8,
+      slope_deg: 24.0,
+      soil_moisture_pct: 45.0,
+      elevation_m: 900.0,
+      ndvi: 0.4,
+      model: 'ensemble'
     }
+    return await fetchJson('/predict-risk', { method: 'POST', body: JSON.stringify(payload) })
   }, [])
 
   const checkSafetyOnce = useCallback(async () => {
@@ -636,6 +613,7 @@ export default function Public() {
 
   useEffect(() => {
     uidRef.current = getOrCreateUid()
+    let locationWatchId = null
 
     const savedUiRisk = (localStorage.getItem(STORAGE.lastRiskUi) || '').trim()
     const initialRisk = savedUiRisk && savedUiRisk !== '--' ? savedUiRisk : '--'
@@ -655,6 +633,27 @@ export default function Public() {
           else setLocationStatus(friendlyLocation('not shared'))
         })
         .catch(() => setLocationStatus(friendlyLocation('not shared')))
+    }
+
+    if (!navigator.geolocation) {
+      setLocationStatus('Live location is unavailable on this device/browser.')
+    } else {
+      locationWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const lat = Number(position.coords.latitude.toFixed(6))
+          const lng = Number(position.coords.longitude.toFixed(6))
+          setLocation({ lat, lng })
+          setLocationStatus(friendlyLocation('active'))
+        },
+        (error) => {
+          if (error.code === 1) {
+            setLocationStatus('Location permission is required to show your live position.')
+            return
+          }
+          setLocationStatus(geolocationErrorToText(error))
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }
+      )
     }
 
     const onOnline = () => {
@@ -733,6 +732,7 @@ export default function Public() {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
+      if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId)
       if (timerRef.current) {
         clearTimeout(timerRef.current)
         timerRef.current = null

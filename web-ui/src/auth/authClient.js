@@ -18,7 +18,7 @@ function safeJsonParse(value) {
   }
 }
 
-function apiFetch(path, options = {}, token = '') {
+export function apiFetch(path, options = {}, token = '') {
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})

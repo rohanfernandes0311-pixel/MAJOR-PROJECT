@@ -33,6 +33,8 @@ function getFeatureStyle(feature, defaultStyle){
 
 export default function MapView({ zones = [], userLocation = null, route = null, risk = 'SAFE' }){
   const ref = useRef()
+  const hasCenteredOnUserRef = useRef(false)
+  const viewportRef = useRef(null)
 
   useEffect(()=>{
     let L
@@ -43,7 +45,11 @@ export default function MapView({ zones = [], userLocation = null, route = null,
       L = (await import('leaflet')).default
       if(!ref.current) return
       
-      map = L.map(ref.current, { zoomControl: true, attributionControl: false, preferCanvas: true }).setView([14.5, 76.2], 6)
+      const savedViewport = viewportRef.current
+      map = L.map(ref.current, { zoomControl: true, attributionControl: false, preferCanvas: true }).setView(
+        savedViewport ? [savedViewport.latitude, savedViewport.longitude] : [14.5, 76.2],
+        savedViewport?.zoom ?? 6
+      )
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
 
       const currentRiskStyle = RISK_STYLES[risk] || RISK_STYLES.SAFE
@@ -95,7 +101,10 @@ export default function MapView({ zones = [], userLocation = null, route = null,
       }
 
       if (route?.start && route?.end) {
-        overlays.push(L.polyline([route.start, route.end], {
+        const routePath = Array.isArray(route.path) && route.path.length >= 2
+          ? route.path
+          : [route.start, route.end]
+        overlays.push(L.polyline(routePath, {
           color: '#7dd3fc',
           weight: 4,
           opacity: 0.9,
@@ -112,15 +121,25 @@ export default function MapView({ zones = [], userLocation = null, route = null,
       }
 
       if (userLocation?.lat && userLocation?.lng) {
-        map.setView([userLocation.lat, userLocation.lng], 9, { animate: true })
-      } else if (zones.length) {
+        if (!hasCenteredOnUserRef.current) {
+          map.setView([userLocation.lat, userLocation.lng], 15, { animate: true })
+          hasCenteredOnUserRef.current = true
+        }
+      } else if (!savedViewport && zones.length) {
         const first = getCenterFromFeature(zones[0])
         if (first) map.setView(first, 7, { animate: true })
       }
     }
     
     init()
-    return ()=>{ overlays.forEach((layer) => layer?.remove?.()); if(map) map.remove() }
+    return ()=>{
+      if (map) {
+        const center = map.getCenter()
+        viewportRef.current = { latitude: center.lat, longitude: center.lng, zoom: map.getZoom() }
+        map.remove()
+      }
+      overlays.forEach((layer) => layer?.remove?.())
+    }
   }, [zones, userLocation, route, risk])
 
   return <div ref={ref} className="w-full h-full" aria-label="Live map showing nearby risk" />
