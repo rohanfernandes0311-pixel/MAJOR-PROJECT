@@ -11,6 +11,7 @@ import {
   loadOfflineEmergencyAlert,
   persistOfflineEmergencyAlert
 } from '../shared/offlineEmergencyAlertStore'
+import { getStoredAuth } from '../auth/authClient'
 
 const FALLBACK_LOCATION = { lat: 18.55, lng: 73.9 }
 const API_BASE = window.location.origin
@@ -118,8 +119,12 @@ function getOrCreateUid() {
 }
 
 async function fetchJson(path, options = {}) {
+  const token = getStoredAuth().token
   const resp = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
     ...options
   })
   if (!resp.ok) {

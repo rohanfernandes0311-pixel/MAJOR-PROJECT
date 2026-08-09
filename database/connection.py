@@ -1,21 +1,10 @@
 import os
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-
-# ---------------------------------------------------------
-# Database URL
-# ---------------------------------------------------------
-# Local development:
-#     SQLite database
-#
-# Production:
-#     Set DATABASE_URL to your PostgreSQL connection string
-#
-# Example:
-#     postgresql+psycopg://username:password@host:5432/landsense
-# ---------------------------------------------------------
+load_dotenv()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -26,11 +15,12 @@ DATABASE_URL = os.getenv(
 # because multiple requests may use the database connection.
 connect_args = {}
 
-if DATABASE_URL.startswith("sqlite"):
-    connect_args = {
-        "check_same_thread": False
-    }
-
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgresql://",
+        "postgresql+psycopg://",
+        1,
+    )
 
 # ---------------------------------------------------------
 # SQLAlchemy Engine

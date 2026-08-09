@@ -57,6 +57,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         "/verify-otp",
         "/public",
         "/assets",
+        "/frontend/assets",
         "/dist",
         "/favicon.ico",
         "/manifest.json",
@@ -66,11 +67,34 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         "/redoc",
         "/_next",
     )
+    EXEMPT_PATHS = {
+        "/",
+        "/admin",
+        "/demo",
+        "/frontend",
+        "/frontend/index.html",
+        "/frontend/login",
+        "/frontend/otp",
+        "/frontend/admin",
+        "/frontend/demo",
+        "/frontend/styles.css",
+        "/frontend/app.js",
+        "/frontend/sw.js",
+        "/frontend/manifest.json",
+        "/frontend-reset",
+        "/health",
+        "/zones",
+        "/events",
+    }
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         # Allow OPTIONS and known public prefixes
-        if request.method == "OPTIONS" or any(path.startswith(p) for p in self.EXEMPT_PATH_PREFIXES):
+        if (
+            request.method == "OPTIONS"
+            or path in self.EXEMPT_PATHS
+            or any(path.startswith(p) for p in self.EXEMPT_PATH_PREFIXES)
+        ):
             return await call_next(request)
 
         auth_header = request.headers.get("authorization")

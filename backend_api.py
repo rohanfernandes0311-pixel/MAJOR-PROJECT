@@ -18,7 +18,7 @@ from typing import Any, Optional
 
 import requests
 from backend.auth.router import router as auth_router
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -32,6 +32,8 @@ from auth_security import (
 )
 from landslide_extraction import router as landslide_extraction_router
 from backend.auth import router as auth_router
+from backend.auth.dependencies import require_auth
+from backend.auth.middleware import JWTAuthMiddleware
 from backend.auth.otp_store import init_store as init_auth_store
 from local_store import (
     create_alert,
@@ -88,6 +90,7 @@ LOCALHOST_NAMES = {"127.0.0.1", "localhost", "::1"}
 
 
 app = FastAPI(title="LandSense Secure API", version="2.0.0")
+app.add_middleware(JWTAuthMiddleware)
 simulation_mode = SimulationModeService(BASE_DIR)
 extensions = ExtensionLoader(base_dir=BASE_DIR)
 weather_service = extensions.weather()
@@ -717,7 +720,7 @@ def admin_simulation_revoke_session(
 
 
 @app.post("/predict-risk")
-def predict_risk(req: PredictRequest) -> dict[str, Any]:
+def predict_risk(req: PredictRequest, _: dict = Depends(require_auth)) -> dict[str, Any]:
     weather = weather_service.fetch_weather_context(req.latitude, req.longitude)
     rain = weather_service.fetch_rainfall_mm(req.latitude, req.longitude)
     pred = predict(
@@ -750,19 +753,29 @@ def predict_risk(req: PredictRequest) -> dict[str, Any]:
 
 
 @app.post("/location-update")
-def legacy_location_update(req: LocationUpdateRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
+def legacy_location_update(
+    req: LocationUpdateRequest,
+    background_tasks: BackgroundTasks,
+    payload: dict = Depends(require_auth),
+) -> dict[str, Any]:
+    user_id = str(payload.get("sub", "")).strip()
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid authenticated user")
+    req.user_id = user_id
     if req.phone_number:
         req.phone_number = _validate_e164(req.phone_number)
-    return _evaluate_location(
+    result = _evaluate_location(
         req,
         background_tasks=background_tasks,
         user_phone=None,
         alert_enabled=False,
     )
+    store_location(user_id, req.latitude, req.longitude)
+    return result
 
 
 @app.post("/route-safe")
-def route_safe(req: RouteRequest) -> dict[str, Any]:
+def route_safe(req: RouteRequest, _: dict = Depends(require_auth)) -> dict[str, Any]:
     zones_geo = load_zones(ZONE_PATH)
     route = plan_safe_route(
         start_lat=req.start_latitude,

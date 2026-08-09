@@ -42,8 +42,6 @@ def get_profile(payload: dict = Depends(get_current_auth_payload)) -> dict[str, 
         "profile": {
             "phone_number": payload.get("phone"),
             "phone_number_masked": f"{str(payload.get('phone', ''))[:3]}******{str(payload.get('phone', ''))[-4:]}",
-            "session_id": payload.get("sid"),
-            "token_jti": payload.get("jti"),
         },
         "authenticated": True,
     }
