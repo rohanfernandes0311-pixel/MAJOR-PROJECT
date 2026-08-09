@@ -74,3 +74,20 @@ def get_db():
         yield db
     finally:
         db.close()
+        # ---------------------------------------------------------
+# Migration target database
+# ---------------------------------------------------------
+
+MIGRATION_DATABASE_URL = "sqlite:///./data/landsense_unified.db"
+
+migration_engine = create_engine(
+    MIGRATION_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    pool_pre_ping=True,
+)
+
+MigrationSessionLocal = sessionmaker(
+    bind=migration_engine,
+    autoflush=False,
+    autocommit=False,
+)
