@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from datetime import timedelta
 from typing import Any
 
@@ -9,7 +10,19 @@ import jwt
 from auth_security import utc_now, new_jti
 
 
-JWT_SECRET = os.getenv("JWT_SECRET", "change-this-in-production")
+def _load_jwt_secret() -> str:
+    secret = os.getenv("JWT_SECRET", "")
+    if len(secret.encode("utf-8")) >= 32:
+        return secret
+
+    environment = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).lower()
+    if environment in {"production", "prod"}:
+        raise RuntimeError("JWT_SECRET must be at least 32 bytes in production")
+
+    return secrets.token_urlsafe(48)
+
+
+JWT_SECRET = _load_jwt_secret()
 JWT_ALGO = os.getenv("JWT_ALGO", "HS256")
 ACCESS_TOKEN_TTL_MIN = int(os.getenv("ACCESS_TOKEN_TTL_MIN", "15"))
 REFRESH_TOKEN_TTL_DAYS = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", "7"))
