@@ -318,3 +318,59 @@ class OTPSession(Base):
         String,
         nullable=True
     )
+    # =========================================================
+# USER SESSIONS
+# =========================================================
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    session_id: Mapped[str] = mapped_column(
+        String,
+        primary_key=True
+    )
+
+    phone_number: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    phone_hash: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    token_jti: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    issued_at: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    expires_at: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    revoked_at: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True
+    )
+
+    last_seen_at: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    last_ip: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True
+    )
+
+    last_user_agent: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True
+    )
