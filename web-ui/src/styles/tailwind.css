@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Basic theme tokens to match design direction */
+:root{
+  --bg-dark: #07101a;
+}
+
+html,body,#root{height:100%}
+body{background:var(--bg-dark)}
+
+.landsense-pulse {
+  animation: landsensePulse 2.6s ease-in-out infinite;
+}
+
+.landsense-safezone {
+  filter: drop-shadow(0 0 10px rgba(125, 211, 252, 0.55));
+}
+
+.safezone-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #7dd3fc;
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 0 0 8px rgba(125, 211, 252, 0.18);
+}
+
+@keyframes landsensePulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}

@@ -1,0 +1,28 @@
+# Core ML & Data Processing
+numpy
+pandas
+scikit-learn
+xgboost
+joblib
+
+# Dashboard & Visualization
+matplotlib
+seaborn
+streamlit
+
+# Backend API
+fastapi
+uvicorn
+pydantic
+firebase-admin
+PyJWT
+pdfplumber
+pypdf
+
+# Integrations & Utilities
+requests
+twilio
+
+# Optional for Phase 2:
+# tensorflow  (for LSTM extension in advanced_extension.py)
+# bridgefy    (for offline mesh communication)

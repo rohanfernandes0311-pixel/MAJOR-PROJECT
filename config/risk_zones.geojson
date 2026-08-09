@@ -1,0 +1,65 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "RGD-01",
+        "name": "Raigad High Risk Belt",
+        "risk_level": "HIGH"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [73.22, 18.34],
+            [73.35, 18.34],
+            [73.35, 18.47],
+            [73.22, 18.47],
+            [73.22, 18.34]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "IDK-02",
+        "name": "Idukki Moderate Risk Patch",
+        "risk_level": "MEDIUM"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.84, 9.78],
+            [76.98, 9.78],
+            [76.98, 9.92],
+            [76.84, 9.92],
+            [76.84, 9.78]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "WYD-03",
+        "name": "Wayanad Critical Scar",
+        "risk_level": "HIGH"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [76.06, 11.53],
+            [76.18, 11.53],
+            [76.18, 11.66],
+            [76.06, 11.66],
+            [76.06, 11.53]
+          ]
+        ]
+      }
+    }
+  ]
+}

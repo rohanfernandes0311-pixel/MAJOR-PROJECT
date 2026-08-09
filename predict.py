@@ -1,0 +1,143 @@
+"""
+==============================================================
+ Landslide Prediction Engine
+==============================================================
+Loads trained models and classifies new sensor readings.
+Integrates with the alert system.
+"""
+
+import numpy as np
+import joblib
+import pandas as pd
+from pathlib import Path
+
+BASE_DIR  = Path(__file__).parent
+MODEL_DIR = BASE_DIR / "models"
+FEATURES  = [
+    "deformation_mm", "velocity_mm_yr", "coherence",
+    "rainfall_mm", "slope_deg", "soil_moisture_pct",
+    "elevation_m", "aspect_deg", "ndvi"
+]
+LABEL_MAP = {0: "Low", 1: "Medium", 2: "High"}
+
+
+def load_models():
+    """Load trained RF and XGB models from disk."""
+    rf_path  = MODEL_DIR / "random_forest.pkl"
+    xgb_path = MODEL_DIR / "xgboost.pkl"
+
+    if not rf_path.exists() or not xgb_path.exists():
+        raise FileNotFoundError(
+            "Trained models not found. Run: python train_models.py"
+        )
+    rf_model  = joblib.load(rf_path)
+    xgb_model = joblib.load(xgb_path)
+    return rf_model, xgb_model
+
+
+def predict(
+    deformation_mm   : float,
+    velocity_mm_yr   : float,
+    coherence        : float,
+    rainfall_mm      : float,
+    slope_deg        : float,
+    soil_moisture_pct: float,
+    elevation_m      : float = 800.0,
+    aspect_deg       : float = 180.0,
+    ndvi             : float = 0.4,
+    model            : str   = "xgboost",   # "random_forest" | "xgboost" | "ensemble"
+) -> dict:
+    """
+    Predict landslide risk for a single pixel / location.
+    
+    Returns:
+        {
+          "risk_label"   : "Low" | "Medium" | "High",
+          "risk_code"    : 0 | 1 | 2,
+          "confidence"   : float,          # probability of predicted class
+          "probabilities": [p_low, p_med, p_high],
+          "model_used"   : str,
+          "feature_values": dict
+        }
+    """
+    rf_model, xgb_model = load_models()
+
+    X = np.array([[
+        deformation_mm, velocity_mm_yr, coherence,
+        rainfall_mm, slope_deg, soil_moisture_pct,
+        elevation_m, aspect_deg, ndvi
+    ]])
+
+    if model == "random_forest":
+        proba    = rf_model.predict_proba(X)[0]
+        pred_cls = int(np.argmax(proba))
+        used     = "Random Forest"
+    elif model == "xgboost":
+        proba    = xgb_model.predict_proba(X)[0]
+        pred_cls = int(np.argmax(proba))
+        used     = "XGBoost"
+    elif model == "ensemble":
+        proba_rf  = rf_model.predict_proba(X)[0]
+        proba_xgb = xgb_model.predict_proba(X)[0]
+        proba     = (proba_rf + proba_xgb) / 2.0
+        pred_cls  = int(np.argmax(proba))
+        used      = "Ensemble (RF + XGB)"
+    else:
+        raise ValueError(f"Unknown model: {model}")
+
+    return {
+        "risk_label"    : LABEL_MAP[pred_cls],
+        "risk_code"     : pred_cls,
+        "confidence"    : float(proba[pred_cls]),
+        "probabilities" : {
+            "Low"   : float(proba[0]),
+            "Medium": float(proba[1]),
+            "High"  : float(proba[2]),
+        },
+        "model_used"    : used,
+        "feature_values": dict(zip(FEATURES, X[0].tolist())),
+    }
+
+
+def batch_predict(df: pd.DataFrame, model: str = "ensemble") -> pd.DataFrame:
+    """Predict risk for a DataFrame with the feature columns."""
+    rf_model, xgb_model = load_models()
+
+    missing = [f for f in FEATURES if f not in df.columns]
+    if missing:
+        raise ValueError(f"DataFrame missing columns: {missing}")
+
+    X = df[FEATURES].values
+
+    if model == "ensemble":
+        proba = (rf_model.predict_proba(X) + xgb_model.predict_proba(X)) / 2
+    elif model == "random_forest":
+        proba = rf_model.predict_proba(X)
+    else:
+        proba = xgb_model.predict_proba(X)
+
+    pred_cls = np.argmax(proba, axis=1)
+    result   = df.copy()
+    result["risk_code"]      = pred_cls
+    result["risk_label"]     = [LABEL_MAP[c] for c in pred_cls]
+    result["confidence"]     = proba[np.arange(len(proba)), pred_cls]
+    result["prob_low"]       = proba[:, 0]
+    result["prob_medium"]    = proba[:, 1]
+    result["prob_high"]      = proba[:, 2]
+    return result
+
+
+if __name__ == "__main__":
+    # Quick test
+    result = predict(
+        deformation_mm    = 28.5,
+        velocity_mm_yr    = 65.0,
+        coherence         = 0.45,
+        rainfall_mm       = 160.0,
+        slope_deg         = 35.0,
+        soil_moisture_pct = 82.0,
+        model             = "ensemble"
+    )
+    print("Prediction result:")
+    for k, v in result.items():
+        print(f"  {k}: {v}")

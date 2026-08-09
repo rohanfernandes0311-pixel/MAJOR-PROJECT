@@ -1,0 +1,12 @@
+config/firebase-service-account.json
+
+__pycache__/
+*.pyc
+
+web-ui/node_modules/
+web-ui/dist/
+
+.env
+.vscode/
+# Local databases
+*.db

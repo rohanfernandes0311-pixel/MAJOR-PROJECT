@@ -1,0 +1,10 @@
+feature,importance
+soil_moisture_pct,0.2329341
+deformation_mm,0.21754906
+velocity_mm_yr,0.19679463
+rainfall_mm,0.09638193
+coherence,0.094086535
+slope_deg,0.056731373
+aspect_deg,0.03765418
+elevation_m,0.035093345
+ndvi,0.03277478

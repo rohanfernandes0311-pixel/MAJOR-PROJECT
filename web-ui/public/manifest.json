@@ -1,0 +1,12 @@
+{
+  "name": "LandSense",
+  "short_name": "LandSense",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07101a",
+  "theme_color": "#07101a",
+  "description": "Live landslide safety monitoring with maps, geofencing and alerts.",
+  "orientation": "portrait",
+  "lang": "en"
+}
