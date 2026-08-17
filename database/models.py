@@ -1,4 +1,4 @@
-from sqlalchemy import Float, Integer, String
+from sqlalchemy import Float, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .connection import Base
@@ -49,6 +49,12 @@ class User(Base):
     last_device_hash: Mapped[str] = mapped_column(
         String,
         nullable=False
+    )
+
+    role: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'Citizen'"),
     )
 
 
@@ -117,6 +123,36 @@ class Alert(Base):
         String,
         nullable=False
     )
+
+
+# =========================================================
+# DATASET-BACKED LANDSLIDE INVENTORY
+# =========================================================
+
+class LandslideInventory(Base):
+    """Historical point inventory imported from a controlled dataset."""
+
+    __tablename__ = "landslide_inventory"
+    __table_args__ = (
+        UniqueConstraint("source_name", "source_record_id", name="uq_landslide_inventory_source_record"),
+    )
+
+    event_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    source_record_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    initiation_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    slide_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    state: Mapped[str] = mapped_column(String(160), nullable=False)
+    district: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    subdivision_or_taluk: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    material_involved: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    movement_type: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    history_date_remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_name: Mapped[str] = mapped_column(String(240), nullable=False)
+    source_page: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'dataset'"))
+    imported_at: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
 # =========================================================

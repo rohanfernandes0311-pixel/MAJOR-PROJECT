@@ -6,13 +6,11 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./data/landsense_unified.db"
-)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL must be configured for PostgreSQL/Neon runtime persistence")
 
-# SQLite requires this option when used with FastAPI
-# because multiple requests may use the database connection.
+# Keep connection options centralized for the PostgreSQL runtime engine.
 connect_args = {}
 
 if DATABASE_URL.startswith("postgresql://"):
@@ -21,6 +19,9 @@ if DATABASE_URL.startswith("postgresql://"):
         "postgresql+psycopg://",
         1,
     )
+
+if not DATABASE_URL.startswith("postgresql+"):
+    raise RuntimeError("DATABASE_URL must target PostgreSQL/Neon; SQLite is migration-only")
 
 # ---------------------------------------------------------
 # SQLAlchemy Engine

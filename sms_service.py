@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -13,6 +13,25 @@ import requests
 SMS_LOG_DIR = Path(__file__).parent / "alerts"
 SMS_LOG_DIR.mkdir(exist_ok=True)
 SMS_LOG_FILE = SMS_LOG_DIR / "sms_log.jsonl"
+
+
+def sms_configuration_status() -> dict[str, object]:
+    """Return non-secret Twilio readiness metadata for controlled delivery."""
+    sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+    from_phone = os.getenv("TWILIO_SMS_FROM", "").strip()
+    try:
+        from twilio.rest import Client as _  # noqa: F401
+        package_available = True
+    except Exception:
+        package_available = False
+    return {
+        "provider": "twilio",
+        "configured": bool(sid and token and from_phone and package_available),
+        "credentials_present": bool(sid and token and from_phone),
+        "package_available": package_available,
+        "unavailable_behavior": "simulated_offline",
+    }
 
 
 def internet_available(test_url: str = "https://www.google.com") -> bool:
@@ -28,7 +47,7 @@ def _log_sms(payload: dict) -> None:
         f.write(json.dumps(payload) + "\n")
 
 
-def send_sms_alert(phone_number: str, message: str) -> dict:
+def send_sms_alert(phone_number: str, message: str, *, allow_simulated_fallback: bool = True) -> dict:
     """
     Sends SMS through Twilio if configured.
     If credentials/network unavailable, writes a simulated offline SMS event.
@@ -38,7 +57,7 @@ def send_sms_alert(phone_number: str, message: str) -> dict:
     from_phone = os.getenv("TWILIO_SMS_FROM", "").strip()
 
     payload = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "phone_number": phone_number,
         "message": message,
         "channel": "sms",
@@ -62,7 +81,8 @@ def send_sms_alert(phone_number: str, message: str) -> dict:
             _log_sms(payload)
             return payload
 
-    payload["status"] = "simulated_offline"
-    payload["provider"] = "gsm_fallback"
-    _log_sms(payload)
+    payload["status"] = "simulated_offline" if allow_simulated_fallback else "unavailable"
+    payload["provider"] = "gsm_fallback" if allow_simulated_fallback else "twilio"
+    if allow_simulated_fallback:
+        _log_sms(payload)
     return payload

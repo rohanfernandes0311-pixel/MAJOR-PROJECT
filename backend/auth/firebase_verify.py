@@ -51,16 +51,17 @@ def exchange_firebase_token(id_token: str, device_hash: str | None = None, last_
     if not uid or not phone_number:
         raise ValueError("Firebase token missing uid or phone_number")
 
-    # Create or update user in local store (keeps existing schema)
+    # Roles are assigned only from the persisted server-side user record.  Do
+    # not accept a role from the Firebase token or client request: new users
+    # must begin as Citizens and existing users retain their stored role.
+    existing = get_user(uid)
+
+    # Create or update the user without changing any stored role.
     phone_hash = hash_phone(phone_number)
     device_hash = device_hash or ""
     upsert_user(uid=uid, phone_number=phone_number, phone_hash=phone_hash, name=name or None, device_hash=device_hash)
 
-    # Issue JWTs via local jwt_service, include role if user exists
-    role = "Citizen"
-    existing = get_user(uid)
-    if existing and existing.get("role"):
-        role = existing.get("role")
+    role = jwt_service.normalize_role(existing.get("role") if existing else None)
 
     session_id = new_jti()
     token_bundle = jwt_service.issue_auth_tokens(
@@ -98,5 +99,5 @@ def exchange_firebase_token(id_token: str, device_hash: str | None = None, last_
         "access_token": token_bundle.get("access_token"),
         "refresh_token": token_bundle.get("refresh_token"),
         "expires_in": access_expires_minutes * 60,
-        "profile": {"uid": uid, "phone_number": phone_number, "name": name},
+        "profile": {"uid": uid, "phone_number": phone_number, "name": name, "role": role},
     }

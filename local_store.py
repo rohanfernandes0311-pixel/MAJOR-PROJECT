@@ -50,6 +50,7 @@ def upsert_user(
                 last_login=now,
                 alert_enabled=1,
                 last_device_hash=device_hash,
+                role="Citizen",
             )
             db.add(user)
 
@@ -65,6 +66,7 @@ def upsert_user(
             "last_login": user.last_login,
             "alert_enabled": user.alert_enabled,
             "last_device_hash": user.last_device_hash,
+            "role": user.role,
         }
 
     except SQLAlchemyError:
@@ -94,6 +96,7 @@ def get_user(uid: str) -> dict[str, Any] | None:
             "last_login": user.last_login,
             "alert_enabled": user.alert_enabled,
             "last_device_hash": user.last_device_hash,
+            "role": user.role,
         }
 
     finally:

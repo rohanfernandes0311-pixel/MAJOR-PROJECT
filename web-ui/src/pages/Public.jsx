@@ -2,25 +2,27 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import MapView from '../shared/MapView'
 import RiskCard from '../shared/RiskCard'
 import EvacuationPanel from '../shared/EvacuationPanel'
-import { BarChart3, ChevronLeft, Home, LayoutDashboard, LogOut, Settings2, User } from 'lucide-react'
-import { Sidebar, SidebarBody, SidebarLink } from '@/components/ui/sidebar'
-import { cn } from '@/lib/utils'
 import {
   clearOfflineEmergencyAlert,
-  isDangerState,
   loadOfflineEmergencyAlert,
   persistOfflineEmergencyAlert
 } from '../shared/offlineEmergencyAlertStore'
 import { apiFetch, getStoredAuth } from '../auth/authClient'
+import { AlertNotificationManager } from '../services/alertNotificationManager'
+import { INCIDENT_DEMO_EVENT, formatIncidentDate, impactLines, readDemoAlert } from '../services/incidentDemo'
+import { citizenRiskCopy, deriveCitizenGeofenceState, normalizeRisk } from '../services/citizenGeofence'
 
 const FALLBACK_LOCATION = { lat: 18.55, lng: 73.9 }
-const API_BASE = window.location.origin
 const STORAGE = {
   uid: 'landsense_uid',
   alerts: 'landsense_alerts_enabled',
   lastRiskUi: 'landsense_last_risk_ui',
   lastRiskRaw: 'landsense_last_risk_raw',
   lastUpdated: 'landsense_last_updated'
+}
+
+function currentNotificationPermission() {
+  return 'Notification' in window ? Notification.permission : 'unsupported'
 }
 
 function getSafeZoneCenter(features) {
@@ -36,51 +38,12 @@ function getSafeZoneCenter(features) {
 }
 
 function getRiskLabel(risk) {
-  if (risk === 'SAFE') return 'SAFE'
-  if (risk === 'WARNING') return 'WARNING'
-  if (risk === 'HIGH' || risk === 'CRITICAL' || risk === 'HIGH RISK') return 'EXTREME'
-  return risk
-}
-
-function getBannerConfig(finalRisk, recommendation) {
-  const toneMap = { SAFE: 'safe', WARNING: 'warning' }
-  return {
-    tone: toneMap[finalRisk] || 'danger',
-    title:
-      finalRisk === 'SAFE'
-        ? 'Safety monitoring is active'
-        : finalRisk === 'WARNING'
-          ? 'Landslide conditions may be changing'
-          : 'High landslide risk detected',
-    body: recommendation
-  }
-}
-
-function getRecommendation(finalRisk) {
-  if (finalRisk === 'HIGH' || finalRisk === 'CRITICAL' || finalRisk === 'HIGH RISK') return 'Evacuation recommended'
-  if (finalRisk === 'WARNING') return 'Stay alert and avoid hilly routes'
-  return 'Conditions look stable for now'
-}
-
-function normalizeRisk(raw) {
-  return String(raw || 'UNKNOWN').trim().toUpperCase()
+  return risk === '--' ? 'LOCATING…' : risk
 }
 
 function isEvacuationRisk(rawRisk) {
   const risk = normalizeRisk(rawRisk)
-  return risk === 'HIGH' || risk === 'CRITICAL'
-}
-
-function toUiRisk(rawRisk) {
-  const risk = normalizeRisk(rawRisk)
-  if (risk === 'LOW' || risk === 'SAFE') return 'SAFE'
-  if (risk === 'MEDIUM' || risk === 'WARNING') return 'WARNING'
-  if (risk === 'HIGH' || risk === 'CRITICAL') return 'HIGH RISK'
-  return '--'
-}
-
-function nextDelayMs() {
-  return Math.floor(10000 + Math.random() * 10000)
+  return risk === 'HIGH' || risk === 'HIGH RISK' || risk === 'CRITICAL' || risk === 'CRITICAL RISK'
 }
 
 function nowTimeText() {
@@ -93,20 +56,6 @@ function geolocationErrorToText(err) {
   if (err.code === 2) return 'Location is unavailable.'
   if (err.code === 3) return 'Location timed out.'
   return "Couldn't access location."
-}
-
-function getCurrentPosition() {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Location is not available on this device.'))
-      return
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 5000
-    })
-  })
 }
 
 function getOrCreateUid() {
@@ -122,9 +71,10 @@ async function fetchJson(path, options = {}) {
 }
 
 function riskBodyText(uiRisk) {
+  if (uiRisk === 'CRITICAL RISK') return 'Your location is inside a CRITICAL risk zone. Follow official emergency guidance immediately.'
   if (uiRisk === 'HIGH RISK') return 'High risk detected. Move to a safer area immediately.'
-  if (uiRisk === 'WARNING') return 'Risk is rising. Stay alert and be ready to move.'
-  if (uiRisk === 'SAFE') return 'Area conditions look stable.'
+  if (uiRisk === 'MEDIUM RISK') return 'You are inside a monitored landslide-risk area. Stay alert.'
+  if (uiRisk === 'SAFE') return 'You are outside configured risk zones.'
   return 'Please check your safety status.'
 }
 
@@ -147,6 +97,17 @@ function WeatherCard({ label, value }) {
       <div className="mt-1 text-sm font-semibold text-white">{value}</div>
     </div>
   )
+}
+
+function AlertRiskPill({ risk }) {
+  const level = String(risk || 'LOW').toUpperCase()
+  const tones = {
+    LOW: 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100',
+    MEDIUM: 'border-amber-300/25 bg-amber-400/10 text-amber-100',
+    HIGH: 'border-orange-300/25 bg-orange-400/10 text-orange-100',
+    CRITICAL: 'border-rose-300/25 bg-rose-400/10 text-rose-100'
+  }
+  return <span className={`rounded-full border px-2 py-1 text-[11px] font-bold tracking-wide ${tones[level] || tones.LOW}`}>{level}</span>
 }
 
 export default function Public() {
@@ -172,31 +133,120 @@ export default function Public() {
   const [loading, setLoading] = useState(false)
   const [monitoring, setMonitoring] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(localStorage.getItem(STORAGE.alerts) === '1')
+  const [notificationPermission, setNotificationPermission] = useState(currentNotificationPermission)
   const [locationStatus, setLocationStatus] = useState('Location not shared')
   const [statusText, setStatusText] = useState('Ready to protect you.')
   const [lastUpdate, setLastUpdate] = useState(localStorage.getItem(STORAGE.lastUpdated) || 'Waiting')
   const [offline, setOffline] = useState(!navigator.onLine)
-  const [simulationState, setSimulationState] = useState({ enabled: false, effective_risk: 'LOW', scenario_name: '' })
+  const [locationAccuracy, setLocationAccuracy] = useState(null)
+  const [activeZoneId, setActiveZoneId] = useState('')
   const [offlineEmergency, setOfflineEmergency] = useState(null)
   const [offlineRestored, setOfflineRestored] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [targetedAlerts, setTargetedAlerts] = useState([])
+  const [alertInboxState, setAlertInboxState] = useState('loading')
+  const [landslideRecords, setLandslideRecords] = useState([])
+  const [demoAlert, setDemoAlert] = useState(() => readDemoAlert())
 
   const uidRef = useRef('')
-  const timerRef = useRef(null)
   const monitoringRef = useRef(false)
   const deferredInstallPromptRef = useRef(null)
   const dashboardRef = useRef(null)
   const mapRef = useRef(null)
   const alertsRef = useRef(null)
+  const alertNotificationManagerRef = useRef(new AlertNotificationManager())
+  const alertPollingTimerRef = useRef(null)
+  const alertRefreshInFlightRef = useRef(false)
+  const latestPositionRef = useRef(null)
+  const evaluatePositionRef = useRef(null)
+  const lastEvaluationAtRef = useRef(0)
+  const lastNotifiedZoneRiskRef = useRef('')
+  const positionEvaluationInFlightRef = useRef(false)
 
-  const navItems = [
-    { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { key: 'home', label: 'Home', icon: Home },
-    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { key: 'profile', label: 'Profile', icon: User },
-    { key: 'settings', label: 'Settings', icon: Settings2 },
-    { key: 'logout', label: 'Logout', icon: LogOut }
-  ]
+  const refreshTargetedAlerts = useCallback(async () => {
+    if (alertRefreshInFlightRef.current) return
+    const token = getStoredAuth().token
+    if (!token) {
+      setAlertInboxState('unavailable')
+      return
+    }
+
+    alertRefreshInFlightRef.current = true
+    try {
+      const response = await apiFetch('/alerts/my', {}, token)
+      const alerts = Array.isArray(response?.alerts) ? response.alerts : []
+      setTargetedAlerts(alerts)
+      setAlertInboxState('ready')
+
+      await alertNotificationManagerRef.current.observe(alerts, {
+        notify: alertsEnabled && notificationPermission === 'granted'
+      })
+    } catch {
+      setAlertInboxState('unavailable')
+    } finally {
+      alertRefreshInFlightRef.current = false
+    }
+  }, [alertsEnabled, notificationPermission])
+
+  useEffect(() => {
+    refreshTargetedAlerts()
+
+    alertPollingTimerRef.current = setInterval(refreshTargetedAlerts, 60000)
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setNotificationPermission(currentNotificationPermission())
+        refreshTargetedAlerts()
+      }
+    }
+    window.addEventListener('online', refreshTargetedAlerts)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+
+    return () => {
+      if (alertPollingTimerRef.current) {
+        clearInterval(alertPollingTimerRef.current)
+        alertPollingTimerRef.current = null
+      }
+      window.removeEventListener('online', refreshTargetedAlerts)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [refreshTargetedAlerts])
+
+  useEffect(() => {
+    const updateDemoAlert = (event) => setDemoAlert(event?.detail || readDemoAlert())
+    const updateFromStorage = () => setDemoAlert(readDemoAlert())
+    window.addEventListener(INCIDENT_DEMO_EVENT, updateDemoAlert)
+    window.addEventListener('storage', updateFromStorage)
+    return () => {
+      window.removeEventListener(INCIDENT_DEMO_EVENT, updateDemoAlert)
+      window.removeEventListener('storage', updateFromStorage)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!demoAlert) return
+    void alertNotificationManagerRef.current.observe([{
+      id: demoAlert.id,
+      risk_level: demoAlert.demo_risk,
+      message: demoAlert.notification_message,
+      simulation: true,
+      timestamp: demoAlert.launched_at
+    }], { notify: alertsEnabled && notificationPermission === 'granted' })
+  }, [demoAlert, alertsEnabled, notificationPermission])
+
+  useEffect(() => {
+    let active = true
+    const token = getStoredAuth().token
+    if (!token) return () => { active = false }
+
+    apiFetch('/landslides?limit=2000', {}, token)
+      .then((response) => {
+        if (active) setLandslideRecords(Array.isArray(response?.landslides) ? response.landslides : [])
+      })
+      .catch(() => {
+        // The safety dashboard and risk-zone map remain available if inventory context is unavailable.
+      })
+
+    return () => { active = false }
+  }, [])
 
   const updateRoute = useCallback(async (zonesData, currentLocation) => {
     if (!zonesData.length || !currentLocation) return
@@ -264,130 +314,91 @@ export default function Public() {
     return await fetchJson('/predict-risk', { method: 'POST', body: JSON.stringify(payload) })
   }, [])
 
-  const checkSafetyOnce = useCallback(async () => {
+  const evaluatePosition = useCallback(async (position) => {
+    if (!position?.coords || positionEvaluationInFlightRef.current) return
+    positionEvaluationInFlightRef.current = true
     setLoading(true)
-    setStatusText('Analyzing nearby conditions...')
-    setLocationStatus(friendlyLocation('finding'))
+    setStatusText('Checking your GPS position against configured risk zones…')
+
+    const lat = Number(position.coords.latitude.toFixed(6))
+    const lng = Number(position.coords.longitude.toFixed(6))
+    const accuracy = Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null
+    const currentLocation = { lat, lng, accuracy }
+    setLocation(currentLocation)
+    setLocationAccuracy(accuracy)
+    setLocationStatus('Live GPS active')
 
     try {
-      let pos
-      try {
-        pos = await getCurrentPosition()
-      } catch (geoErr) {
-        setLocationStatus(friendlyLocation('not available'))
-        setStatusText(geolocationErrorToText(geoErr))
-        return
-      }
-
-      const lat = Number(pos.coords.latitude.toFixed(6))
-      const lng = Number(pos.coords.longitude.toFixed(6))
-      const currentLocation = { lat, lng }
-      setLocation(currentLocation)
-      setLocationStatus(friendlyLocation('active'))
-
-      let locationUpdate = null
-      try {
-        locationUpdate = await fetchJson('/location-update', {
-          method: 'POST',
-          body: JSON.stringify({
-            user_id: uidRef.current,
-            location_name: 'Mobile User',
-            latitude: lat,
-            longitude: lng
-          })
+      // Persist the authenticated user's real browser coordinates for existing
+      // targeting. Its response is deliberately not used for Citizen risk because
+      // the Phase 4 Admin simulation can decorate that legacy response.
+      const locationPersistence = fetchJson('/location-update', {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: uidRef.current,
+          location_name: 'Mobile User',
+          latitude: lat,
+          longitude: lng
         })
-      } catch {
-        // Prediction endpoint may still succeed.
-      }
+      }).catch(() => null)
 
-      let prediction = null
+      let prediction
       try {
         prediction = await tryPredict(lat, lng)
       } catch {
-        // location-update may already contain final_risk.
+        setStatusText('Unable to check configured risk zones right now. Your GPS marker remains live.')
+        setWeather(null)
+        setStatus((previous) => ({ ...previous, risk: '--', recommendation: 'Risk status unavailable until geofencing can be checked.' }))
+        setBanner({ tone: 'warning', title: 'RISK STATUS UNAVAILABLE', body: 'Your location is known, but configured geofencing could not be checked.' })
+        return
+      } finally {
+        void locationPersistence
       }
 
-      const rawRisk =
-        locationUpdate?.final_risk ||
-        prediction?.final_risk ||
-        prediction?.risk_level ||
-        prediction?.risk ||
-        prediction?.prediction?.risk_label ||
-        prediction?.prediction?.riskLabel ||
-        'UNKNOWN'
+      const geofence = deriveCitizenGeofenceState(prediction)
+      const copy = citizenRiskCopy(geofence.uiRisk, geofence.activeZoneName)
+      setActiveZoneId(geofence.activeZoneId)
+      setWeather(prediction?.weather || null)
+      setStatus((previous) => ({
+        risk: geofence.uiRisk,
+        confidence: Number(prediction?.prediction?.confidence ?? previous.confidence ?? 0),
+        rainfall: prediction?.rainfall?.rainfall_mm ?? previous.rainfall,
+        soil_moisture: Number(prediction?.prediction?.feature_values?.soil_moisture_pct ?? previous.soil_moisture),
+        deformation: Number(prediction?.prediction?.feature_values?.deformation_mm ?? previous.deformation),
+        recommendation: copy.recommendation,
+        alert: copy.recommendation
+      }))
+      setBanner({ tone: copy.tone, title: copy.title, body: copy.body })
+      setEvacuation(isEvacuationRisk(geofence.uiRisk) ? prediction?.evacuation || null : null)
 
-      const simulation = locationUpdate?.simulation || { enabled: false, effective_risk: 'LOW', scenario_name: '' }
-      setSimulationState(simulation)
-      const weatherContext = locationUpdate?.weather || prediction?.weather || null
-      setWeather(weatherContext)
+      const updatedAt = nowTimeText()
+      setLastUpdate(updatedAt)
+      setStatusText(geofence.activeZoneName ? `Live geofence: ${geofence.activeZoneName}` : 'Live geofence: outside configured risk zones')
+      localStorage.setItem(STORAGE.lastRiskUi, geofence.uiRisk)
+      localStorage.setItem(STORAGE.lastRiskRaw, geofence.rawRisk)
+      localStorage.setItem(STORAGE.lastUpdated, updatedAt)
 
-      const uiRisk = toUiRisk(rawRisk)
-      const hasFreshRisk = uiRisk !== '--'
-
-      if (hasFreshRisk) {
-        const normalizedRaw = normalizeRisk(rawRisk)
-        const finalRisk = uiRisk === 'HIGH RISK' ? 'HIGH' : uiRisk
-        const recommendation = getRecommendation(finalRisk)
-
-        const rainfall =
-          locationUpdate?.rainfall?.rainfall_mm ??
-          prediction?.rainfall?.rainfall_mm ??
-          status.rainfall
-        const evacuationGuidance = locationUpdate?.evacuation || prediction?.evacuation || null
-
-        setStatus({
-          risk: uiRisk,
-          confidence: Number(prediction?.prediction?.confidence ?? locationUpdate?.ml_prediction?.confidence ?? status.confidence ?? 0),
-          rainfall,
-          soil_moisture: Number(
-            prediction?.prediction?.feature_values?.soil_moisture_pct ??
-              locationUpdate?.ml_prediction?.feature_values?.soil_moisture_pct ??
-              status.soil_moisture
-          ),
-          deformation: Number(
-            prediction?.prediction?.feature_values?.deformation_mm ??
-              locationUpdate?.ml_prediction?.feature_values?.deformation_mm ??
-              status.deformation
-          ),
-          recommendation,
-          alert: recommendation
+      if (geofence.uiRisk !== 'SAFE') {
+        const emergencySnapshot = persistOfflineEmergencyAlert({
+          risk_level: geofence.rawRisk,
+          ui_risk: geofence.uiRisk,
+          recommendation: copy.recommendation,
+          banner_title: copy.title,
+          evacuation_warning: copy.recommendation,
+          danger_state: true,
+          simulation: { enabled: false },
+          location: currentLocation,
+          timestamp: new Date().toISOString()
         })
+        setOfflineEmergency(emergencySnapshot)
+        setOfflineRestored(false)
 
-        setBanner(getBannerConfig(finalRisk, recommendation))
-        setEvacuation(isEvacuationRisk(finalRisk) ? evacuationGuidance : null)
-        const updatedAt = nowTimeText()
-        setLastUpdate(updatedAt)
-        setStatusText('Updated just now')
-        localStorage.setItem(STORAGE.lastRiskUi, uiRisk)
-        localStorage.setItem(STORAGE.lastRiskRaw, normalizedRaw)
-        localStorage.setItem(STORAGE.lastUpdated, updatedAt)
-
-        if (isDangerState(uiRisk, simulation.enabled)) {
-          const emergencySnapshot = persistOfflineEmergencyAlert({
-            risk_level: normalizedRaw,
-            ui_risk: uiRisk,
-            recommendation,
-            banner_title: getBannerConfig(finalRisk, recommendation).title,
-            evacuation_warning: recommendation,
-            danger_state: true,
-            simulation,
-            location: currentLocation,
-            timestamp: new Date().toISOString()
-          })
-          setOfflineEmergency(emergencySnapshot)
-          setOfflineRestored(false)
-        } else {
-          clearOfflineEmergencyAlert()
-          setOfflineEmergency(null)
-          setOfflineRestored(false)
-          setEvacuation(null)
-          setRoute(null)
-        }
-
-        if (uiRisk === 'HIGH RISK' || uiRisk === 'WARNING') {
-          await showLocalAlert(uiRisk)
+        const notificationKey = `${geofence.activeZoneId}:${geofence.rawRisk}`
+        if (lastNotifiedZoneRiskRef.current !== notificationKey) {
+          lastNotifiedZoneRiskRef.current = notificationKey
+          await showLocalAlert(geofence.uiRisk)
           if ('speechSynthesis' in window && alertsEnabled) {
-            const utterance = new SpeechSynthesisUtterance(`${getBannerConfig(finalRisk, recommendation).title}. ${recommendation}.`)
+            const utterance = new SpeechSynthesisUtterance(`${copy.title}. ${copy.recommendation}`)
             utterance.rate = 0.92
             utterance.pitch = 1
             utterance.lang = 'en-US'
@@ -396,80 +407,42 @@ export default function Public() {
           }
         }
       } else {
-        // Restore the latest persisted emergency warning when live refresh fails.
-        setWeather(null)
-        const cached = loadOfflineEmergencyAlert()
-        if (cached) {
-          setOfflineEmergency(cached)
-          setOfflineRestored(true)
-          setStatus((prev) => ({
-            ...prev,
-            risk: cached.ui_risk || prev.risk,
-            recommendation: cached.recommendation || prev.recommendation,
-            alert: cached.evacuation_warning || prev.alert
-          }))
-          setBanner({
-            tone: 'danger',
-            title: cached.banner_title || 'High landslide risk detected',
-            body: cached.recommendation || 'Evacuation recommended'
-          })
-          setStatusText('Using persisted emergency warning')
-        } else {
-          setStatusText(navigator.onLine ? "Couldn't update right now." : 'Using latest saved safety update')
-        }
+        lastNotifiedZoneRiskRef.current = ''
+        clearOfflineEmergencyAlert()
+        setOfflineEmergency(null)
+        setOfflineRestored(false)
         setEvacuation(null)
         setRoute(null)
       }
 
-      if (isEvacuationRisk(uiRisk) && zones.length) {
+      if (isEvacuationRisk(geofence.uiRisk) && zones.length) {
         await updateRoute(zones, currentLocation)
       } else {
         setRoute(null)
       }
     } finally {
+      positionEvaluationInFlightRef.current = false
       setLoading(false)
     }
-  }, [alertsEnabled, showLocalAlert, status, tryPredict, updateRoute, zones])
+  }, [alertsEnabled, showLocalAlert, tryPredict, updateRoute, zones])
+
+  useEffect(() => {
+    evaluatePositionRef.current = evaluatePosition
+  }, [evaluatePosition])
+
+  const checkSafetyOnce = useCallback(async () => {
+    if (!latestPositionRef.current) {
+      setStatusText('Location access is required to determine whether you are inside a risk zone.')
+      return
+    }
+    await evaluatePosition(latestPositionRef.current)
+  }, [evaluatePosition])
 
   const stopMonitoring = useCallback(() => {
     monitoringRef.current = false
     setMonitoring(false)
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
     setStatusText('Monitoring paused')
   }, [])
-
-  const scrollToSection = useCallback(
-    (key) => {
-      if (key === 'dashboard' || key === 'home') {
-        dashboardRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-        return
-      }
-      if (key === 'analytics') {
-        mapRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-        return
-      }
-      if (key === 'profile' || key === 'settings') {
-        alertsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
-        return
-      }
-      if (key === 'logout') {
-        stopMonitoring()
-        setAlertsEnabled(false)
-        localStorage.removeItem(STORAGE.alerts)
-      }
-    },
-    [stopMonitoring]
-  )
-
-  const monitoringLoop = useCallback(async () => {
-    if (!monitoringRef.current) return
-    await checkSafetyOnce()
-    if (!monitoringRef.current) return
-    timerRef.current = setTimeout(monitoringLoop, nextDelayMs())
-  }, [checkSafetyOnce])
 
   const startMonitoring = useCallback(async () => {
     if (monitoringRef.current) return
@@ -487,117 +460,52 @@ export default function Public() {
       }
     }
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-
-    await monitoringLoop()
-  }, [monitoringLoop])
-
-  const fetchVapidPublicKey = useCallback(async () => {
-    const candidates = ['/vapid-public-key', '/push-public-key', '/public-key', '/vapidPublicKey']
-    for (const path of candidates) {
-      try {
-        const resp = await fetch(`${API_BASE}${path}`)
-        if (!resp.ok) continue
-        const txt = (await resp.text()).trim()
-        if (txt) return txt
-      } catch {
-        // Try next endpoint.
-      }
-    }
-    return null
-  }, [])
-
-  const urlBase64ToUint8Array = useCallback((base64String) => {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-    const rawData = atob(base64)
-    const arr = new Uint8Array(rawData.length)
-    for (let i = 0; i < rawData.length; i += 1) arr[i] = rawData.charCodeAt(i)
-    return arr
-  }, [])
+    await checkSafetyOnce()
+  }, [checkSafetyOnce])
 
   const enableAlerts = useCallback(async () => {
     if (!('Notification' in window)) {
-      setStatusText("Alerts aren't supported on this device.")
+      setNotificationPermission('unsupported')
+      setStatusText("Browser alerts aren't supported on this device. Your inbox will keep working.")
       return
     }
 
     const perm = await Notification.requestPermission()
+    setNotificationPermission(perm)
     if (perm !== 'granted') {
-      setStatusText('Alerts are off')
+      setAlertsEnabled(false)
+      localStorage.removeItem(STORAGE.alerts)
+      setStatusText(
+        perm === 'denied'
+          ? 'Browser alerts are blocked. Your in-app alert inbox is still active.'
+          : 'Browser alerts were not enabled. Your in-app alert inbox is still active.'
+      )
       return
     }
 
     if (!('serviceWorker' in navigator)) {
-      setStatusText("Alerts aren't available on this device.")
+      setStatusText("Browser alerts aren't available on this device. Your inbox will keep working.")
       return
     }
 
-    let registration
     try {
-      registration = await navigator.serviceWorker.register('/sw.js')
-      try {
-        await registration.update()
-      } catch {
-        // Ignore transient update errors.
-      }
+      await navigator.serviceWorker.register('/sw.js')
     } catch {
-      setStatusText("Couldn't enable alerts right now.")
+      setStatusText("Couldn't enable browser alerts right now. Your inbox will keep working.")
       return
-    }
-
-    let subscription = null
-    try {
-      subscription = await registration.pushManager.getSubscription()
-      if (!subscription) {
-        const vapidKey = await fetchVapidPublicKey()
-        if (vapidKey) {
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey)
-          })
-        }
-      }
-    } catch {
-      // Push not configured server-side.
-    }
-
-    try {
-      await fetchJson('/subscribe', {
-        method: 'POST',
-        body: JSON.stringify({ alert_enabled: true, user_id: uidRef.current, subscription })
-      })
-    } catch {
-      // Optional endpoint in some deployments.
     }
 
     setAlertsEnabled(true)
     localStorage.setItem(STORAGE.alerts, '1')
-    setStatusText('Alerts are on')
-
-    try {
-      const reg = await navigator.serviceWorker.ready
-      await reg.showNotification('Landslide Alert', {
-        body: "Alerts are ready. You'll be warned here if risk rises.",
-        tag: 'landsense-enabled',
-        data: { url: '/' }
-      })
-    } catch {
-      // Notification may fail when OS suppresses duplicates.
-    }
-  }, [fetchVapidPublicKey, urlBase64ToUint8Array])
+    setStatusText('Browser alerts are enabled for newly targeted alerts.')
+  }, [])
 
   useEffect(() => {
     let mounted = true
 
     async function fetchZones() {
       try {
-        const res = await fetch('/zones')
-        if (!res.ok) return
-        const json = await res.json()
+        const json = await apiFetch('/zones', {}, getStoredAuth().token)
         const features = Array.isArray(json.features) ? json.features : []
         if (mounted) setZones(features)
       } catch {
@@ -614,15 +522,11 @@ export default function Public() {
   useEffect(() => {
     uidRef.current = getOrCreateUid()
     let locationWatchId = null
-
-    const savedUiRisk = (localStorage.getItem(STORAGE.lastRiskUi) || '').trim()
-    const initialRisk = savedUiRisk && savedUiRisk !== '--' ? savedUiRisk : '--'
-    if (initialRisk !== '--') {
-      const normalized = initialRisk === 'HIGH RISK' ? 'HIGH' : initialRisk
-      const recommendation = getRecommendation(normalized)
-      setStatus((prev) => ({ ...prev, risk: initialRisk, recommendation, alert: recommendation }))
-      setBanner(getBannerConfig(normalized, recommendation))
-    }
+    monitoringRef.current = true
+    setMonitoring(true)
+    setLocationStatus('Locating you…')
+    setStatusText('Location access is required to determine whether you are inside a risk zone.')
+    setBanner({ tone: 'warning', title: 'LOCATING YOU…', body: 'Waiting for live GPS before determining your risk-zone status.' })
 
     if (navigator.permissions && navigator.permissions.query) {
       navigator.permissions
@@ -637,20 +541,37 @@ export default function Public() {
 
     if (!navigator.geolocation) {
       setLocationStatus('Live location is unavailable on this device/browser.')
+      setStatusText('Unable to determine your current location. Please enable location services and try again.')
+      setBanner({ tone: 'warning', title: 'RISK STATUS UNAVAILABLE', body: 'Live geofencing requires browser location access.' })
     } else {
       locationWatchId = navigator.geolocation.watchPosition(
         (position) => {
           const lat = Number(position.coords.latitude.toFixed(6))
           const lng = Number(position.coords.longitude.toFixed(6))
-          setLocation({ lat, lng })
-          setLocationStatus(friendlyLocation('active'))
+          latestPositionRef.current = position
+          const accuracy = Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null
+          setLocation({ lat, lng, accuracy })
+          setLocationAccuracy(accuracy)
+          setLocationStatus('Live GPS active')
+          const now = Date.now()
+          if (monitoringRef.current && now - lastEvaluationAtRef.current >= 10000) {
+            lastEvaluationAtRef.current = now
+            void evaluatePositionRef.current?.(position)
+          }
         },
         (error) => {
+          latestPositionRef.current = null
+          setLocation(null)
+          setLocationAccuracy(null)
+          setStatus((previous) => ({ ...previous, risk: '--', recommendation: 'Live geofencing requires your current location.' }))
+          setBanner({ tone: 'warning', title: 'RISK STATUS UNAVAILABLE', body: 'Live geofencing requires browser location access.' })
           if (error.code === 1) {
             setLocationStatus('Location permission is required to show your live position.')
+            setStatusText('Live geofencing cannot operate while location access is denied.')
             return
           }
-          setLocationStatus(geolocationErrorToText(error))
+          setLocationStatus('Unable to determine your current location.')
+          setStatusText(`${geolocationErrorToText(error)} Please enable location services and try again.`)
         },
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }
       )
@@ -663,7 +584,7 @@ export default function Public() {
     const onOffline = () => {
       setOffline(true)
       const cached = loadOfflineEmergencyAlert()
-      if (!cached) return
+      if (!cached || cached?.simulation?.enabled) return
       setOfflineEmergency(cached)
       setOfflineRestored(true)
       if (!status.risk || status.risk === '--') {
@@ -710,7 +631,9 @@ export default function Public() {
     }
 
     const cached = loadOfflineEmergencyAlert()
-    if (cached) {
+    if (cached?.simulation?.enabled) {
+      clearOfflineEmergencyAlert()
+    } else if (cached) {
       setOfflineEmergency(cached)
       if (offline) setOfflineRestored(true)
       if (!navigator.onLine) {
@@ -733,9 +656,9 @@ export default function Public() {
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
       if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId)
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
+      if (alertPollingTimerRef.current) {
+        clearInterval(alertPollingTimerRef.current)
+        alertPollingTimerRef.current = null
       }
       window.speechSynthesis.cancel()
     }
@@ -752,23 +675,6 @@ export default function Public() {
       updateRoute(zones, location)
     }
   }, [zones, location, status.risk, updateRoute])
-
-  useEffect(() => {
-    if (simulationState.enabled) return
-    if (status.risk === '--') return
-    if (isDangerState(status.risk, false)) return
-    clearOfflineEmergencyAlert()
-    setOfflineEmergency(null)
-    setOfflineRestored(false)
-  }, [status.risk, simulationState.enabled])
-
-  useEffect(() => {
-    if (simulationState.enabled) return
-    if (!offlineEmergency?.simulation?.enabled) return
-    clearOfflineEmergencyAlert()
-    setOfflineEmergency(null)
-    setOfflineRestored(false)
-  }, [offlineEmergency, simulationState.enabled])
 
   const riskLabel = useMemo(() => getRiskLabel(status.risk), [status.risk])
 
@@ -791,97 +697,9 @@ export default function Public() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_28%),linear-gradient(180deg,_#06111b_0%,_#091421_100%)] px-4 py-4 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1600px] lg:grid lg:grid-cols-[290px_minmax(0,1fr)] lg:gap-6">
-        <aside className="mb-4 overflow-hidden rounded-[28px] border border-white/8 bg-[#0b1522]/95 shadow-[0_20px_80px_rgba(3,7,18,0.45)] backdrop-blur xl:sticky xl:top-6 xl:mb-0 xl:h-[calc(100vh-3rem)]">
-          <Sidebar open={sidebarOpen} setOpen={setSidebarOpen}>
-            <SidebarBody
-              className={cn(
-                'justify-between gap-10 bg-transparent text-white',
-                'w-full px-0 py-0'
-              )}
-            >
-              <div className="flex h-full flex-1 flex-col overflow-hidden px-5 py-5">
-                <div className="flex items-center justify-between border-b border-white/8 pb-5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#22c1ff_0%,#7c3aed_55%,#c026d3_100%)] text-sm font-black text-white shadow-lg shadow-cyan-500/20">
-                      L
-                    </div>
-                    <div>
-                      <div className="text-xl font-bold tracking-tight text-white">Land Sense</div>
-                      <div className="text-xs uppercase tracking-[0.22em] text-slate-400">Command Center</div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen((current) => !current)}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/5 text-slate-400"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <nav className="flex-1 py-5">
-                  <div className="space-y-2">
-                    {navItems.map((item, index) => {
-                      const Icon = item.icon
-                      const active = index === 0
-                      return (
-                        <SidebarLink
-                          key={item.key}
-                          link={{
-                            label: item.label,
-                            href: '#',
-                            icon: (
-                              <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${active ? 'bg-white/12' : 'bg-white/5'}`}>
-                                <Icon className="h-5 w-5" />
-                              </span>
-                            )
-                          }}
-                          className={`group flex items-center justify-between rounded-2xl px-4 py-4 text-left transition ${
-                            active
-                              ? 'bg-[linear-gradient(135deg,#2563eb_0%,#7c3aed_55%,#c026d3_100%)] text-white shadow-lg shadow-violet-500/20'
-                              : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                          }`}
-                          onClick={(event) => {
-                            event.preventDefault()
-                            scrollToSection(item.key)
-                          }}
-                        />
-                      )
-                    })}
-                  </div>
-
-                  <div className="mt-6 rounded-[24px] border border-white/8 bg-[#08101a] p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,#06b6d4_0%,#22c55e_100%)] text-sm font-bold text-white">
-                        LS
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-white">LandSense Public View</div>
-                        <div className="text-sm text-slate-400">{monitoring ? 'Monitoring nearby conditions' : 'Ready to protect you'}</div>
-                      </div>
-                    </div>
-                    <div className="mt-4 rounded-2xl border border-white/8 bg-white/5 px-3 py-2 text-xs text-slate-300">
-                      {alertsEnabled ? 'Alerts are enabled for this device.' : 'Enable alerts to receive live warnings.'}
-                    </div>
-                  </div>
-                </nav>
-              </div>
-            </SidebarBody>
-          </Sidebar>
-        </aside>
-
+      <div className="mx-auto max-w-[1600px]">
         <main className="space-y-6">
-          {simulationState.enabled ? (
-            <div className="mx-auto max-w-screen-xl px-0 pt-0">
-          <div className="rounded-2xl border border-amber-300/40 bg-amber-500/15 px-4 py-3 text-sm text-amber-100 shadow-lg">
-            <div className="text-xs font-semibold tracking-[0.24em]">⚠ SIMULATION MODE ACTIVE</div>
-            <div className="mt-1">
-              Emergency simulation is overriding live geofence state ({simulationState.effective_risk || 'HIGH'} risk).
-            </div>
-          </div>
-            </div>
-          ) : null}
+          {demoAlert ? <div className="mx-auto max-w-screen-xl"><div className="rounded-2xl border border-red-300/40 bg-red-500/15 px-4 py-3 text-sm text-red-50"><div className="text-xs font-bold tracking-[0.24em]">LANDSENSE DEMO ALERT</div><div className="mt-1 text-lg font-bold">{demoAlert.title}</div><div>{demoAlert.location_name}, {demoAlert.district} · {formatIncidentDate(demoAlert.date)}</div><div className="mt-2 font-bold text-amber-200">SIMULATION — NOT A LIVE ALERT</div></div></div> : null}
 
           {offline ? (
             <div className="mx-auto max-w-screen-xl px-0 pt-0">
@@ -956,6 +774,7 @@ export default function Public() {
                   <div className="text-right">
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Location status</div>
                     <div className="mt-1 text-sm font-semibold">{locationStatus}</div>
+                    {locationAccuracy != null ? <div className={`mt-1 text-xs ${locationAccuracy > 100 ? 'text-amber-200' : 'text-emerald-200'}`}>Location accuracy: {locationAccuracy > 100 ? 'Low' : locationAccuracy > 30 ? 'Moderate' : 'Good'} (±{locationAccuracy} m)</div> : null}
                     <div className="mt-2 text-xs text-slate-400">Last check: {lastUpdate}</div>
                   </div>
                 </div>
@@ -977,6 +796,24 @@ export default function Public() {
               <div className="space-y-4" ref={alertsRef}>
                 <RiskCard risk={status.risk} confidence={status.confidence} rainfall={status.rainfall} recommendation={status.recommendation} />
 
+                <section id="targeted-alerts" className="rounded-3xl border border-white/8 bg-white/5 p-4 backdrop-blur-xl">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">Targeted alerts</div>
+                      <p className="mt-1 text-xs text-slate-400">Alerts assigned to your authenticated account.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={refreshTargetedAlerts} className="text-xs font-semibold text-cyan-200 hover:text-cyan-100">Refresh</button>
+                      <span className="text-xs text-slate-400">{alertInboxState === 'ready' ? targetedAlerts.length + (demoAlert ? 1 : 0) : '…'}</span>
+                    </div>
+                  </div>
+                  {alertInboxState === 'loading' ? <p className="mt-3 text-sm text-slate-400">Loading targeted alerts…</p> : null}
+                  {demoAlert ? <div className="mt-3 rounded-xl border border-red-300/30 bg-red-500/10 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div className="text-sm font-black tracking-wide text-red-100">🚨 LANDSLIDE ALERT</div><AlertRiskPill risk={demoAlert.demo_risk} /></div><h3 className="mt-3 text-lg font-bold">{demoAlert.title}</h3><p className="mt-1 text-sm">📍 {demoAlert.location_name}, {demoAlert.district}</p>{demoAlert.location_precision === 'approximate' ? <p className="mt-1 text-xs text-slate-400">Approximate incident location</p> : null}<p className="mt-1 text-sm">📅 {formatIncidentDate(demoAlert.date)}</p><p className="mt-3 text-sm text-slate-100">{demoAlert.short_description}</p><div className="mt-3 flex flex-wrap gap-2">{impactLines(demoAlert).map((line) => <span key={line} className="rounded-full border border-white/15 px-2.5 py-1 text-xs">{line}</span>)}</div><p className="mt-3 text-sm font-semibold text-amber-100">⚠️ {demoAlert.safety_guidance}</p><p className="mt-3 text-xs font-black tracking-[0.16em] text-red-200">SIMULATION — NOT A LIVE ALERT</p></div> : null}
+                  {alertInboxState === 'ready' && !targetedAlerts.length && !demoAlert ? <p className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-slate-400">No targeted alerts</p> : null}
+                  {alertInboxState === 'ready' && targetedAlerts.length ? <div className="mt-3 space-y-2">{targetedAlerts.map((alert, index) => <div key={alert.id ?? `${alert.timestamp}-${index}`} className="rounded-xl border border-white/8 bg-black/20 p-3"><div className="flex items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><AlertRiskPill risk={alert.risk_level} />{String(alert.source_type || '').toUpperCase().includes('SIMULATION') ? <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[10px] font-bold tracking-wide text-amber-100">SIMULATION — NOT A LIVE ALERT</span> : null}</div><span className="text-xs text-slate-400">{alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}</span></div><p className="mt-2 text-sm text-slate-100">{alert.message}</p></div>)}</div> : null}
+                  {alertInboxState === 'unavailable' ? <p className="mt-3 text-sm text-slate-400">Targeted alerts are unavailable right now.</p> : null}
+                </section>
+
                 {isEvacuationRisk(status.risk) ? (
                   <EvacuationPanel evacuation={evacuation} weather={weather} risk={status.risk} onReplayGuidance={speakBanner} />
                 ) : null}
@@ -987,6 +824,13 @@ export default function Public() {
                     <WeatherCard label="Humidity" value={`${Number(weather.humidity_pct || 0).toFixed(0)}%`} />
                     <WeatherCard label="Wind speed" value={`${Number(weather.wind_speed_mps || 0).toFixed(1)} m/s`} />
                     <WeatherCard label="Weather" value={`${weather.weather_main || 'Unknown'}${weather.weather_description ? ` • ${weather.weather_description}` : ''}`} />
+                    <p className={`col-span-2 text-xs ${weather.source_type === 'simulated' ? 'text-amber-200' : weather.source_type === 'unavailable' ? 'text-rose-200' : 'text-slate-400'}`}>
+                      {weather.source_type === 'simulated'
+                        ? 'Estimated weather conditions are being shown.'
+                        : weather.source_type === 'unavailable'
+                          ? 'Current weather conditions are temporarily unavailable.'
+                          : 'Current weather conditions were updated recently.'}
+                    </p>
                   </section>
                 ) : null}
 
@@ -1010,14 +854,26 @@ export default function Public() {
                 </section>
 
                 <section className="rounded-3xl border border-white/8 bg-white/5 p-4 backdrop-blur-xl">
+                  <div className="mb-3">
+                    <div className="text-sm font-semibold">Browser alert permission</div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {notificationPermission === 'granted'
+                        ? 'Granted — newly targeted alerts can appear as browser notifications.'
+                        : notificationPermission === 'denied'
+                          ? 'Denied — allow notifications in browser settings to opt in. Your inbox still works.'
+                          : notificationPermission === 'unsupported'
+                            ? 'Not supported on this browser. Your inbox still works.'
+                            : 'Optional — enable browser alerts to receive newly targeted warnings while this dashboard is open.'}
+                    </p>
+                  </div>
                   <div className="flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={enableAlerts}
-                      disabled={alertsEnabled}
+                      disabled={alertsEnabled && notificationPermission === 'granted'}
                       className="rounded-xl border border-cyan-300/30 bg-cyan-400/15 px-4 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-50"
                     >
-                      {alertsEnabled ? 'Alerts enabled' : 'Turn on alerts'}
+                      {alertsEnabled && notificationPermission === 'granted' ? 'Browser alerts enabled' : 'Enable browser alerts'}
                     </button>
                     <button
                       type="button"
@@ -1038,25 +894,6 @@ export default function Public() {
                   </div>
                 </section>
 
-                {simulationState.enabled ? (
-                  <section className="rounded-3xl border border-red-300/30 bg-red-500/10 p-4 backdrop-blur-xl">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.24em] text-red-100/80">Emergency drill panel</div>
-                        <div className="mt-1 text-lg font-semibold text-red-100">Siren / alarm interface active</div>
-                        <div className="mt-1 text-sm text-red-50/90">Follow evacuation guidance and proceed to the highlighted safe route.</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={speakBanner}
-                        className="rounded-xl border border-red-200/35 bg-red-400/20 px-4 py-2 text-sm font-semibold text-red-50"
-                      >
-                        Replay evacuation guidance
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-
                 <section className="rounded-3xl border border-white/8 bg-white/5 p-4 backdrop-blur-xl">
                   <div className="text-sm font-semibold">Recommendations</div>
                   <div className="mt-3 grid gap-3">
@@ -1072,7 +909,7 @@ export default function Public() {
               </div>
 
               <section ref={mapRef} className="min-h-[60vh] overflow-hidden rounded-[2rem] border border-white/8 bg-[#091521] shadow-2xl">
-                <MapView zones={zones} userLocation={location} route={route} risk={status.risk === 'HIGH RISK' ? 'HIGH' : status.risk} />
+                <MapView zones={zones} userLocation={location} userLocationStatus={locationStatus} selectedZone={zones.find((zone) => String(zone?.properties?.zone_id || '') === activeZoneId) || null} route={route} risk={status.risk === 'CRITICAL RISK' ? 'CRITICAL' : status.risk === 'HIGH RISK' ? 'HIGH' : status.risk === 'MEDIUM RISK' ? 'MEDIUM' : 'SAFE'} landslideRecords={landslideRecords} />
               </section>
             </main>
           </div>

@@ -10,14 +10,15 @@ import {
   maskPhoneNumber,
   savePendingPhone,
 } from '../auth/authClient'
-import { confirmOtpAndExchange, isFirebaseSignInPending, startPhoneSignIn } from '../services/authService'
+import { confirmOtpAndExchange, isFirebaseSignInPending, resetPhoneSignIn, startPhoneSignIn } from '../services/authService'
 import { useAuth } from '../auth/AuthProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { rememberPreviousPhoneNumber } from '../services/phoneHistory'
 
 export default function OTP() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { signIn, authenticated } = useAuth()
+  const { signIn, authenticated, profile } = useAuth()
   const [phoneNumber, setPhoneNumber] = useState('')
   const [maskedPhone, setMaskedPhone] = useState('')
   const [returnTo, setReturnTo] = useState('/')
@@ -28,6 +29,7 @@ export default function OTP() {
   const [success, setSuccess] = useState('')
   const [cooldown, setCooldown] = useState(30)
   const [toast, setToast] = useState(null)
+  const [accessDecision, setAccessDecision] = useState('')
   const verifyInFlightRef = useRef(false)
   const resendInFlightRef = useRef(false)
 
@@ -38,15 +40,16 @@ export default function OTP() {
     return {
       phoneNumber: statePhone || stored.phoneNumber,
       maskedPhone: stateMask || stored.maskedPhone,
-      returnTo: location.state?.returnTo || stored.returnTo || '/'
+      returnTo: location.state?.returnTo || stored.returnTo || '/',
+      loginIntent: location.state?.loginIntent || stored.loginIntent || 'citizen'
     }
   }, [location.state])
 
   useEffect(() => {
-    if (authenticated) {
-      navigate(returnTo, { replace: true })
+    if (authenticated && !accessDecision) {
+      navigate(String(profile?.role || '').toLowerCase() === 'admin' ? '/admin' : '/', { replace: true })
     }
-  }, [authenticated, navigate, returnTo])
+  }, [accessDecision, authenticated, navigate, profile?.role])
 
   useEffect(() => {
     if (!pending.phoneNumber) {
@@ -79,11 +82,20 @@ export default function OTP() {
     setSuccess('')
     try {
       const data = await confirmOtpAndExchange(code)
+      const verifiedRole = String(data?.profile?.role || '').toLowerCase()
+      const adminRequested = pending.loginIntent === 'admin'
+      const isAdmin = verifiedRole === 'admin'
+      if (adminRequested && !isAdmin) {
+        setAccessDecision('citizen-admin-blocked')
+      }
+      rememberPreviousPhoneNumber(phoneNumber)
       signIn(data)
       clearPendingPhone()
-      setSuccess('Verification successful. Redirecting to the dashboard...')
+      setSuccess(adminRequested && !isAdmin ? 'Verification successful.' : 'Verification successful. Redirecting to the dashboard...')
       setToast({ tone: 'success', message: 'Phone number verified successfully.' })
-      navigate(returnTo || '/', { replace: true })
+      if (!adminRequested || isAdmin) {
+        navigate(isAdmin ? '/admin' : '/', { replace: true })
+      }
     } catch (err) {
       setError(err?.message || 'Verification failed.')
       setToast({ tone: 'error', message: err?.message || 'Verification failed.' })
@@ -101,7 +113,7 @@ export default function OTP() {
     try {
       await startPhoneSignIn(phoneNumber)
       const masked = maskPhoneNumber(phoneNumber)
-      savePendingPhone(phoneNumber, masked, returnTo)
+      savePendingPhone(phoneNumber, masked, returnTo, pending.loginIntent)
       setMaskedPhone(masked)
       setToast({ tone: 'success', message: 'A new OTP has been sent.' })
       setCooldown(30)
@@ -116,8 +128,14 @@ export default function OTP() {
   }
 
   function handleEditPhone() {
+    const phoneToEdit = phoneNumber
+    const loginIntent = pending.loginIntent
+    setOtp('')
+    setError('')
+    setSuccess('')
+    resetPhoneSignIn()
     clearPendingPhone()
-    navigate('/login', { replace: true, state: { from: returnTo } })
+    navigate('/login', { replace: true, state: { from: returnTo, editPhoneNumber: phoneToEdit, loginIntent } })
   }
 
   return (
@@ -169,7 +187,7 @@ export default function OTP() {
                 <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em]">Type the one-time code</h2>
               </div>
               <div className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.2em] text-slate-300">
-                JWT protected
+                {pending.loginIntent === 'admin' ? 'Admin request' : 'Citizen request'}
               </div>
             </div>
 
@@ -202,7 +220,14 @@ export default function OTP() {
                 </motion.div>
               ) : null}
 
-              <div className="flex flex-col gap-3 sm:flex-row">
+              {accessDecision === 'citizen-admin-blocked' ? (
+                <div className="rounded-2xl border border-amber-300/25 bg-amber-400/10 px-4 py-4 text-sm text-amber-50">
+                  <div className="font-semibold">Administrator access required. Your account is registered as a Citizen.</div>
+                  <button type="button" onClick={() => navigate('/', { replace: true })} className="mt-3 rounded-xl bg-amber-200 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-100">Continue to Citizen Dashboard</button>
+                </div>
+              ) : null}
+
+              {accessDecision !== 'citizen-admin-blocked' ? <div className="flex flex-col gap-3 sm:flex-row">
                 <VerifyButton
                   loading={verifying}
                   disabled={otp.length !== 6}
@@ -220,7 +245,7 @@ export default function OTP() {
                   <RefreshCw className={`h-4 w-4 ${resending ? 'animate-spin' : ''}`} />
                   Resend OTP
                 </button>
-              </div>
+              </div> : null}
 
               <div className="rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
                 <div className="flex items-start gap-3">

@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import hmac
 import json
-import os
-import secrets
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
 RISK_SCORE = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
-ALLOWED_FORCED_RISKS = {"HIGH", "CRITICAL"}
+ALLOWED_FORCED_RISKS = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 
 
 def _utc_iso() -> str:
@@ -33,9 +30,9 @@ def _centroid_from_ring(ring: list[list[float]]) -> tuple[float, float] | None:
 @dataclass(slots=True)
 class SimulationState:
     enabled: bool = False
-    forced_risk: str = "HIGH"
-    escalation_enabled: bool = True
-    scenario_name: str = "Demo Danger Mode"
+    forced_risk: str = "LOW"
+    escalation_enabled: bool = False
+    scenario_name: str = "Normal"
     enabled_at_utc: str | None = None
     danger_zone_id: str | None = None
     danger_zone_name: str | None = None
@@ -49,56 +46,8 @@ class SimulationModeService:
     def __init__(self, base_dir: Path) -> None:
         self._lock = threading.Lock()
         self._state = SimulationState()
-        self._sessions: dict[str, datetime] = {}
-        self._admin_key = os.getenv("SIMULATION_ADMIN_KEY", "").strip()
-        self._session_ttl_minutes = max(1, int(os.getenv("SIMULATION_SESSION_TTL_MIN", "30")))
-        self._allow_external_notifications = (
-            os.getenv("SIMULATION_ALLOW_EXTERNAL_NOTIFICATIONS", "false").strip().lower()
-            in {"1", "true", "yes", "on"}
-        )
         self._event_log = base_dir / "alerts" / "simulation_events.jsonl"
         self._event_log.parent.mkdir(parents=True, exist_ok=True)
-
-    def is_configured(self) -> bool:
-        return bool(self._admin_key)
-
-    def authorize(self, provided_key: str | None) -> bool:
-        if not self._admin_key:
-            return False
-        candidate = (provided_key or "").strip()
-        if not candidate:
-            return False
-        return hmac.compare_digest(self._admin_key, candidate)
-
-    def create_admin_session(self) -> dict[str, str]:
-        token = secrets.token_urlsafe(32)
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=self._session_ttl_minutes)
-        with self._lock:
-            self._prune_expired_sessions_locked()
-            self._sessions[token] = expires_at
-        return {
-            "session_token": token,
-            "expires_at_utc": expires_at.isoformat(),
-        }
-
-    def validate_admin_session(self, session_token: str | None) -> bool:
-        candidate = (session_token or "").strip()
-        if not candidate:
-            return False
-        with self._lock:
-            self._prune_expired_sessions_locked()
-            expiry = self._sessions.get(candidate)
-            if not expiry:
-                return False
-            return expiry > datetime.now(timezone.utc)
-
-    def revoke_admin_session(self, session_token: str | None) -> bool:
-        candidate = (session_token or "").strip()
-        if not candidate:
-            return False
-        with self._lock:
-            self._prune_expired_sessions_locked()
-            return self._sessions.pop(candidate, None) is not None
 
     def read_state(self) -> dict[str, Any]:
         with self._lock:
@@ -113,9 +62,9 @@ class SimulationModeService:
         scenario_name: str,
         zones_geo: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        forced = str(forced_risk or "HIGH").upper()
+        forced = str(forced_risk or "LOW").upper()
         if forced not in ALLOWED_FORCED_RISKS:
-            forced = "HIGH"
+            forced = "LOW"
 
         with self._lock:
             if enabled:
@@ -123,7 +72,7 @@ class SimulationModeService:
                 self._state.enabled = True
                 self._state.forced_risk = forced
                 self._state.escalation_enabled = bool(escalation_enabled)
-                self._state.scenario_name = (scenario_name or "Demo Danger Mode").strip() or "Demo Danger Mode"
+                self._state.scenario_name = (scenario_name or "Normal").strip() or "Normal"
                 self._state.enabled_at_utc = _utc_iso()
                 self._state.danger_zone_id = zone.get("zone_id")
                 self._state.danger_zone_name = zone.get("zone_name")
@@ -238,7 +187,8 @@ class SimulationModeService:
         return base
 
     def _should_suppress_external_notifications_locked(self) -> bool:
-        return bool(self._state.enabled and not self._allow_external_notifications)
+        # Simulation is always display-only; it must never activate live alerts.
+        return bool(self._state.enabled)
 
     def _pick_danger_zone(self, zones_geo: dict[str, Any] | None) -> dict[str, Any]:
         features = list((zones_geo or {}).get("features") or [])
@@ -279,9 +229,3 @@ class SimulationModeService:
 
         ranked.sort(key=lambda x: x[0], reverse=True)
         return ranked[0][1]
-
-    def _prune_expired_sessions_locked(self) -> None:
-        now = datetime.now(timezone.utc)
-        expired = [token for token, expiry in self._sessions.items() if expiry <= now]
-        for token in expired:
-            self._sessions.pop(token, None)

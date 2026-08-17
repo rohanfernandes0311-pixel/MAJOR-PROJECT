@@ -52,7 +52,10 @@ def post_refresh(req: TokenRefreshRequest, request: Request) -> dict[str, Any]:
     sub = str(payload.get("sub", "")).strip()
     phone = str(payload.get("phone", "")).strip()
     device = str(payload.get("device", "")).strip() or request_fingerprint(request)
-    role = str(payload.get("role", "Citizen")).strip() or "Citizen"
+    # Re-read the role from trusted persisted state.  This prevents a stale
+    # refresh token from preserving a role after a server-side role change.
+    user = get_user(sub) if sub else None
+    role = jwt_service.normalize_role(user.get("role") if user else None)
     if not sub or not phone:
         raise HTTPException(status_code=400, detail="Malformed token payload")
 
@@ -100,9 +103,9 @@ def get_me(payload: dict = Depends(RequireAuthMiddleware())) -> dict[str, Any]:
     session = get_user_session_by_jti(jti) if jti else None
     sub = payload.get("sub")
     user = get_user(str(sub)) if sub else None
-    role = payload.get("role", "Citizen")
+    role = jwt_service.normalize_role(payload.get("role"))
     if user and user.get("role"):
-        role = user.get("role")
+        role = jwt_service.normalize_role(user.get("role"))
 
     phone = str(payload.get("phone", ""))
     profile = {

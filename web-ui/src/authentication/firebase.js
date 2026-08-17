@@ -57,4 +57,10 @@ function createRecaptcha(containerId = "recaptcha-container") {
   return recaptchaVerifierInstance;
 }
 
-export { createRecaptcha, getFirebaseAuth };
+function resetRecaptcha() {
+  if (recaptchaVerifierInstance) recaptchaVerifierInstance.clear();
+  recaptchaVerifierInstance = null;
+  recaptchaContainerId = "";
+}
+
+export { createRecaptcha, getFirebaseAuth, resetRecaptcha };

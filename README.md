@@ -135,48 +135,15 @@ Design goals:
 - Reuse of existing emergency alert UI and pipeline
 - Safe rollback by disabling simulation mode
 
-### Security + Configuration
+### Security
 
-Set an admin key before using simulation controls:
-
-```bash
-set SIMULATION_ADMIN_KEY=replace_with_strong_random_secret
-```
-
-Optional toggle:
-
-```bash
-set SIMULATION_ALLOW_EXTERNAL_NOTIFICATIONS=false
-set SIMULATION_SESSION_TTL_MIN=30
-```
-
-Notes:
-
-- `SIMULATION_ADMIN_KEY` is required to read/update simulation state.
-- External notifications are suppressed by default during simulation for safety.
-- Admin session tokens are short-lived and in-memory (default 30 minutes).
+- Simulation state is available only to users whose signed JWT has the `Admin` role.
+- There is no separate simulation key or session mechanism.
+- External notifications are always suppressed while simulation is enabled.
 
 ### Simulation API Contract
 
-Protected header required for all simulation admin APIs:
-
-- `X-Simulation-Admin-Key: <SIMULATION_ADMIN_KEY>`
-- or `X-Simulation-Session: <short_lived_session_token>`
-
-Session bootstrap endpoints:
-
-- `POST /admin/simulation/session`
-	- Request body:
-
-```json
-{
-	"admin_key": "<SIMULATION_ADMIN_KEY>"
-}
-```
-
-	- Returns short-lived simulation session token.
-- `DELETE /admin/simulation/session`
-	- Revokes current session token.
+Every simulation endpoint requires `Authorization: Bearer <admin access token>`.
 
 Endpoints:
 
@@ -190,8 +157,8 @@ Endpoints:
 {
 	"enabled": true,
 	"forced_risk": "HIGH",
-	"escalation_enabled": true,
-	"scenario_name": "Demo Danger Mode"
+	"escalation_enabled": false,
+	"scenario_name": "High Risk"
 }
 ```
 
@@ -200,10 +167,11 @@ Endpoints:
 
 Behavior when enabled:
 
-- Simulates a dangerous geofence context
-- Forces risk to `HIGH` (optional escalation to `CRITICAL`)
+- Simulates a configured risk-zone context
+- Uses the selected risk (`LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`)
 - Triggers existing emergency alert rendering/voice flows
-- Keeps simulation events separated from live event analytics storage
+- Keeps simulation events separate from live event analytics storage
+- Never creates live alerts or queues SMS notifications
 
 ### Demo Drill Runbook
 
@@ -213,7 +181,7 @@ Behavior when enabled:
 python backend_api.py
 ```
 
-2. Open admin dashboard (`/admin`), enter simulation admin key, enable `Demo Danger Mode`.
+2. Sign in as an Admin and open the admin dashboard (`/admin`), then enable a scenario.
 3. Open public dashboard (`/`) and start monitoring.
 4. Verify emergency state:
 	- `⚠ SIMULATION MODE ACTIVE` banner visible

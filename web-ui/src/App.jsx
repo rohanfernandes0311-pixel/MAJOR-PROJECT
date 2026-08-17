@@ -25,8 +25,8 @@ export default function App(){
           <Route path="/frontend/index.html" element={<AuthGate><Public/></AuthGate>} />
           <Route path="/admin" element={<ProtectedRoute role="Admin"><Admin/></ProtectedRoute>} />
           <Route path="/frontend/admin" element={<ProtectedRoute role="Admin"><Admin/></ProtectedRoute>} />
-          <Route path="/demo" element={<AuthGate><DemoMode/></AuthGate>} />
-          <Route path="/frontend/demo" element={<AuthGate><DemoMode/></AuthGate>} />
+          <Route path="/demo" element={<ProtectedRoute role="Admin"><DemoMode/></ProtectedRoute>} />
+          <Route path="/frontend/demo" element={<ProtectedRoute role="Admin"><DemoMode/></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

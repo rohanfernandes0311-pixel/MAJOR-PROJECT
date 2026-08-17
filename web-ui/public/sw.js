@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1'
+const CACHE_VERSION = 'v2'
 const CACHE_NAME = `landsense-web-ui-${CACHE_VERSION}`
 
 const APP_SHELL = ['/', '/manifest.json']
@@ -28,6 +28,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url)
 
   if (url.origin !== self.location.origin) return
+
+  // Never cache authenticated API responses. In particular, /alerts/my is
+  // scoped by the bearer token even though every citizen uses the same URL.
+  if (url.pathname.startsWith('/alerts/') || req.headers.has('Authorization')) {
+    event.respondWith(fetch(req))
+    return
+  }
 
   if (req.mode === 'navigate') {
     event.respondWith(

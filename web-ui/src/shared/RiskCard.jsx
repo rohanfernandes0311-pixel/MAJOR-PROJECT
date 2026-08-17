@@ -1,8 +1,8 @@
 const RISK_CONFIG = {
-  SAFE: { color: 'bg-emerald-500', label: 'You are safe' },
-  WARNING: { color: 'bg-yellow-500', label: 'Stay alert' },
+  SAFE: { color: 'bg-emerald-500', label: 'Outside configured risk zones' },
+  'MEDIUM RISK': { color: 'bg-yellow-500', label: 'Stay alert' },
   'HIGH RISK': { color: 'bg-orange-500', label: 'High risk' },
-  CRITICAL: { color: 'bg-red-600', label: 'Extreme' },
+  'CRITICAL RISK': { color: 'bg-red-600', label: 'Critical risk' },
   '--': { color: 'bg-slate-600', label: 'Awaiting live update' }
 }
 

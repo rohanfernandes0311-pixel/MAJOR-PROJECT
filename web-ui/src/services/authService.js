@@ -1,4 +1,4 @@
-import { createRecaptcha, getFirebaseAuth } from "../authentication/firebase";
+import { createRecaptcha, getFirebaseAuth, resetRecaptcha } from "../authentication/firebase";
 import { signInWithPhoneNumber } from "firebase/auth";
 
 const FIREBASE_SIGNIN_KEY = "landsense_firebase_signin_active";
@@ -49,7 +49,6 @@ function toFriendlyAuthError(err, fallbackMessage) {
 }
 
 async function startPhoneSignIn(phoneNumber, containerId = "recaptcha-container") {
-  console.debug("[authService] startPhoneSignIn called", { phoneNumber, containerId });
   try {
     const auth = getFirebaseAuth();
     console.debug("[authService] Firebase auth instance ready");
@@ -66,6 +65,14 @@ async function startPhoneSignIn(phoneNumber, containerId = "recaptcha-container"
     console.error("[authService] startPhoneSignIn failed", err);
     throw new Error(toFriendlyAuthError(err, "Unable to send OTP right now."));
   }
+}
+
+function resetPhoneSignIn() {
+  confirmationResultRef = null;
+  confirmInFlight = false;
+  if (typeof window !== "undefined") window.__confirmationResult = null;
+  clearPendingFirebaseSignIn();
+  resetRecaptcha();
 }
 
 async function confirmOtpAndExchange(otp) {
@@ -141,4 +148,4 @@ function isFirebaseSignInPending() {
   return Boolean(getPendingFirebaseSignIn()) && Boolean(confirmationResultRef || window.__confirmationResult);
 }
 
-export { startPhoneSignIn, confirmOtpAndExchange, refreshTokens, logout, getProfile, isFirebaseSignInPending };
+export { startPhoneSignIn, confirmOtpAndExchange, refreshTokens, logout, getProfile, isFirebaseSignInPending, resetPhoneSignIn };

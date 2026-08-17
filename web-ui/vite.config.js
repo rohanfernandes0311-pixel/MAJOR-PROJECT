@@ -11,6 +11,8 @@ const proxiedPaths = [
   '/profile',
   '/logout',
   '/zones',
+  '/alerts',
+  '/landslides',
   '/events',
   '/predict',
   '/predict-risk',

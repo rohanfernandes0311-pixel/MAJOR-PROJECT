@@ -174,7 +174,7 @@ export default function DemoMode() {
           </div>
 
           <div className="min-h-[68vh] overflow-hidden rounded-[2rem] border border-white/8 bg-[#08131e] shadow-2xl">
-            <MapView zones={zones} userLocation={{ lat: active.lat, lng: active.lng }} route={route} risk={active.risk} />
+            <MapView zones={zones} simulatedLocation={{ lat: active.lat, lng: active.lng, label: active.name }} route={route} risk={active.risk} simulation />
           </div>
         </section>
       </div>

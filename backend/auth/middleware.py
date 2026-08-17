@@ -32,6 +32,17 @@ def get_current_user(authorization: str | None = Header(default=None)) -> dict[s
     return payload
 
 
+def require_admin(payload: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    """Require an authenticated JWT issued to an Admin role.
+
+    The role is deliberately taken from the signed access-token payload; callers
+    cannot supply a role through a request header or body.
+    """
+    if str(payload.get("role", "")).strip().lower() != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    return payload
+
+
 class RequireAuthMiddleware:
     """ASGI-style middleware-like dependency provider.
 

@@ -28,11 +28,17 @@ ACCESS_TOKEN_TTL_MIN = int(os.getenv("ACCESS_TOKEN_TTL_MIN", "15"))
 REFRESH_TOKEN_TTL_DAYS = int(os.getenv("REFRESH_TOKEN_TTL_DAYS", "7"))
 
 
+def normalize_role(role: str | None) -> str:
+    """Return a supported role without trusting unrecognised input."""
+    value = str(role or "").strip().lower()
+    return "Admin" if value == "admin" else "Citizen"
+
+
 def issue_auth_tokens(*, subject: str, phone_number: str, device_hash: str, session_id: str, role: str | None = None) -> dict[str, str | int]:
     now = utc_now()
     access_jti = new_jti()
     refresh_jti = new_jti()
-    role = role or "Citizen"
+    role = normalize_role(role)
 
     access_payload = {
         "sub": subject,

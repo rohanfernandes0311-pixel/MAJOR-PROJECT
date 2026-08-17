@@ -6,7 +6,8 @@ const STORAGE = {
   profile: 'landsense_auth_profile',
   pendingPhone: 'landsense_pending_phone',
   pendingMask: 'landsense_pending_phone_mask',
-  pendingReturnTo: 'landsense_pending_return_to'
+  pendingReturnTo: 'landsense_pending_return_to',
+  pendingLoginIntent: 'landsense_pending_login_intent'
 }
 
 function safeJsonParse(value) {
@@ -96,17 +97,19 @@ export function clearAuthSession() {
   localStorage.removeItem(STORAGE.profile)
 }
 
-export function savePendingPhone(phoneNumber, maskedPhone, returnTo = '/') {
+export function savePendingPhone(phoneNumber, maskedPhone, returnTo = '/', loginIntent = 'citizen') {
   sessionStorage.setItem(STORAGE.pendingPhone, phoneNumber)
   sessionStorage.setItem(STORAGE.pendingMask, maskedPhone || maskPhoneNumber(phoneNumber))
   sessionStorage.setItem(STORAGE.pendingReturnTo, returnTo || '/')
+  sessionStorage.setItem(STORAGE.pendingLoginIntent, loginIntent === 'admin' ? 'admin' : 'citizen')
 }
 
 export function getPendingPhone() {
   return {
     phoneNumber: sessionStorage.getItem(STORAGE.pendingPhone) || '',
     maskedPhone: sessionStorage.getItem(STORAGE.pendingMask) || '',
-    returnTo: sessionStorage.getItem(STORAGE.pendingReturnTo) || '/'
+    returnTo: sessionStorage.getItem(STORAGE.pendingReturnTo) || '/',
+    loginIntent: sessionStorage.getItem(STORAGE.pendingLoginIntent) === 'admin' ? 'admin' : 'citizen'
   }
 }
 
@@ -114,6 +117,7 @@ export function clearPendingPhone() {
   sessionStorage.removeItem(STORAGE.pendingPhone)
   sessionStorage.removeItem(STORAGE.pendingMask)
   sessionStorage.removeItem(STORAGE.pendingReturnTo)
+  sessionStorage.removeItem(STORAGE.pendingLoginIntent)
 }
 
 export function sendOtp(phoneNumber) {
@@ -131,9 +135,9 @@ export function verifyOtp(phoneNumber, otp) {
 }
 
 export function fetchProfile(token) {
-  return apiFetch('/profile', { method: 'GET' }, token)
+  return apiFetch('/auth/me', { method: 'GET' }, token)
 }
 
 export function logout(token) {
-  return apiFetch('/logout', { method: 'POST' }, token)
+  return apiFetch('/auth/logout', { method: 'POST' }, token)
 }

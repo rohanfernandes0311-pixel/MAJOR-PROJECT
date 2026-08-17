@@ -9,6 +9,7 @@ never interrupt the core system.
 from __future__ import annotations
 
 import os
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Protocol
@@ -27,6 +28,19 @@ class WeatherProvider(Protocol):
 
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+SOURCE_REAL = "real"
+SOURCE_SIMULATED = "simulated"
+SOURCE_UNAVAILABLE = "unavailable"
+SOURCE_TYPES = {SOURCE_REAL, SOURCE_SIMULATED, SOURCE_UNAVAILABLE}
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 @dataclass(slots=True)
@@ -67,6 +81,9 @@ class OpenWeatherProvider:
                     or float(wind.get("speed", 0.0)) >= 12.0
                 ),
                 "source": self.name,
+                "observed_at": datetime.fromtimestamp(
+                    float(data.get("dt", datetime.now(timezone.utc).timestamp())), timezone.utc
+                ).isoformat(),
                 "internet_ok": True,
             }
         except Exception:
@@ -102,6 +119,9 @@ class WeatherApiProvider:
                 "weather_description": str(current.get("condition", {}).get("text", "")).strip() or "Unknown",
                 "storm_indicator": bool(float(rainfall_mm) >= 25.0 or float(current.get("wind_kph", 0.0)) >= 45.0),
                 "source": self.name,
+                "observed_at": datetime.fromtimestamp(
+                    float(current.get("last_updated_epoch", datetime.now(timezone.utc).timestamp())), timezone.utc
+                ).isoformat(),
                 "internet_ok": True,
             }
         except Exception:
@@ -127,13 +147,19 @@ class NasaPowerProvider:
             payload = response.json()
             params_data = payload.get("properties", {}).get("parameter", {})
             rain_series = params_data.get("PRECTOTCORR", {})
-            rainfall_mm = 0.0
-            for value in rain_series.values():
+            valid_readings: list[tuple[str, float]] = []
+            for date, value in rain_series.items():
                 try:
-                    rainfall_mm = float(value)
-                    break
-                except Exception:
+                    parsed = float(value)
+                    if math.isfinite(parsed) and parsed >= 0:
+                        valid_readings.append((str(date), parsed))
+                except (TypeError, ValueError):
                     continue
+            if not valid_readings:
+                return None
+            # NASA POWER is daily data. Select its most recent valid daily
+            # observation rather than relying on JSON object iteration order.
+            observed_date, rainfall_mm = max(valid_readings, key=lambda item: item[0])
             return {
                 "rainfall_mm": rainfall_mm,
                 "temperature_c": 0.0,
@@ -144,6 +170,7 @@ class NasaPowerProvider:
                 "weather_description": "Unknown",
                 "storm_indicator": bool(rainfall_mm >= 25.0),
                 "source": self.name,
+                "observed_at": observed_date,
                 "internet_ok": True,
             }
         except Exception:
@@ -176,6 +203,7 @@ class ImdWeatherProvider:
                 "weather_description": str(data.get("weather_description", "Unknown")),
                 "storm_indicator": bool(data.get("storm_indicator", rainfall_mm >= 25.0)),
                 "source": self.name,
+                "observed_at": str(data.get("timestamp") or data.get("observed_at") or _utc_iso()),
                 "internet_ok": True,
             }
         except Exception:
@@ -186,6 +214,9 @@ class ImdWeatherProvider:
 class WeatherExtensionService:
     providers: list[WeatherProvider] | None = None
     cache_ttl_seconds: int = 300
+    allow_simulated_fallback: bool = field(
+        default_factory=lambda: _env_flag("WEATHER_ALLOW_SIMULATED_FALLBACK", True)
+    )
     _cache: dict[str, tuple[float, dict[str, Any]]] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -228,12 +259,37 @@ class WeatherExtensionService:
             return "moderate"
         return "low"
 
+    @staticmethod
+    def _number(value: Any, default: float = 0.0, *, minimum: float | None = None) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return default
+        if not math.isfinite(parsed) or (minimum is not None and parsed < minimum):
+            return default
+        return parsed
+
+    def _finalize(self, snapshot: dict[str, Any], *, cache_hit: bool, cache_age_seconds: int = 0) -> dict[str, Any]:
+        """Return the public weather contract without exposing provider credentials."""
+        snapshot["source_type"] = snapshot.get("source_type") if snapshot.get("source_type") in SOURCE_TYPES else SOURCE_UNAVAILABLE
+        # `source` is deliberately the classification; `provider` identifies
+        # the vendor. This prevents a synthetic value being mistaken for data
+        # from a real weather provider.
+        snapshot["source"] = snapshot["source_type"]
+        snapshot["rainfall_mm"] = self._number(snapshot.get("rainfall_mm"), minimum=0.0)
+        snapshot["timestamp"] = str(snapshot.get("timestamp") or _utc_iso())
+        snapshot["observed_at"] = str(snapshot.get("observed_at") or snapshot["timestamp"])
+        snapshot["cache_hit"] = cache_hit
+        snapshot["cache_age_seconds"] = cache_age_seconds
+        snapshot["weather_severity"] = self._weather_severity(snapshot)
+        return snapshot
+
     def fetch_weather_context(self, latitude: float, longitude: float) -> dict[str, Any]:
         cache_key = self._cache_key(latitude, longitude)
         cached = self._cache.get(cache_key)
         now = datetime.now(timezone.utc).timestamp()
         if cached and (now - cached[0]) <= self.cache_ttl_seconds:
-            return dict(cached[1])
+            return self._finalize(dict(cached[1]), cache_hit=True, cache_age_seconds=max(0, int(now - cached[0])))
 
         for provider in self.providers or []:
             try:
@@ -243,39 +299,60 @@ class WeatherExtensionService:
                         "latitude": latitude,
                         "longitude": longitude,
                         "timestamp": _utc_iso(),
-                        "source": result.get("source", provider.name),
+                        "provider": result.get("source", provider.name),
+                        "observed_at": result.get("observed_at"),
+                        "source_type": SOURCE_REAL,
                         "internet_ok": bool(result.get("internet_ok", True)),
-                        "rainfall_mm": float(result.get("rainfall_mm", 0.0) or 0.0),
-                        "temperature_c": float(result.get("temperature_c", 0.0) or 0.0),
-                        "humidity_pct": float(result.get("humidity_pct", 0.0) or 0.0),
-                        "wind_speed_mps": float(result.get("wind_speed_mps", 0.0) or 0.0),
-                        "cloud_pct": float(result.get("cloud_pct", 0.0) or 0.0),
+                        "rainfall_mm": self._number(result.get("rainfall_mm"), minimum=0.0),
+                        "temperature_c": self._number(result.get("temperature_c")),
+                        "humidity_pct": self._number(result.get("humidity_pct"), minimum=0.0),
+                        "wind_speed_mps": self._number(result.get("wind_speed_mps"), minimum=0.0),
+                        "cloud_pct": self._number(result.get("cloud_pct"), minimum=0.0),
                         "weather_main": str(result.get("weather_main", "Unknown") or "Unknown"),
                         "weather_description": str(result.get("weather_description", "Unknown") or "Unknown"),
                         "storm_indicator": bool(result.get("storm_indicator", False)),
                     }
-                    snapshot["weather_severity"] = self._weather_severity(snapshot)
+                    snapshot = self._finalize(snapshot, cache_hit=False)
                     self._cache[cache_key] = (now, snapshot)
                     return dict(snapshot)
             except Exception:
                 continue
 
-        snapshot = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "rainfall_mm": simulated_rainfall_mm(latitude, longitude),
-            "temperature_c": 0.0,
-            "humidity_pct": 0.0,
-            "wind_speed_mps": 0.0,
-            "cloud_pct": 0.0,
-            "weather_main": "Simulated",
-            "weather_description": "Synthetic fallback",
-            "storm_indicator": False,
-            "source": "simulated",
-            "timestamp": _utc_iso(),
-            "internet_ok": False,
-        }
-        snapshot["weather_severity"] = self._weather_severity(snapshot)
+        if self.allow_simulated_fallback:
+            snapshot = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "rainfall_mm": simulated_rainfall_mm(latitude, longitude),
+                "temperature_c": 0.0,
+                "humidity_pct": 0.0,
+                "wind_speed_mps": 0.0,
+                "cloud_pct": 0.0,
+                "weather_main": "Simulated",
+                "weather_description": "Synthetic fallback",
+                "storm_indicator": False,
+                "provider": "synthetic_coordinate_fallback",
+                "source_type": SOURCE_SIMULATED,
+                "timestamp": _utc_iso(),
+                "internet_ok": False,
+            }
+        else:
+            snapshot = {
+                "latitude": latitude,
+                "longitude": longitude,
+                "rainfall_mm": 0.0,
+                "temperature_c": 0.0,
+                "humidity_pct": 0.0,
+                "wind_speed_mps": 0.0,
+                "cloud_pct": 0.0,
+                "weather_main": "Unavailable",
+                "weather_description": "No weather provider available",
+                "storm_indicator": False,
+                "provider": None,
+                "source_type": SOURCE_UNAVAILABLE,
+                "timestamp": _utc_iso(),
+                "internet_ok": False,
+            }
+        snapshot = self._finalize(snapshot, cache_hit=False)
         self._cache[cache_key] = (now, snapshot)
         return dict(snapshot)
 
@@ -283,8 +360,13 @@ class WeatherExtensionService:
         context = self.fetch_weather_context(latitude, longitude)
         return {
             "rainfall_mm": context.get("rainfall_mm", 0.0),
-            "source": context.get("source", "simulated"),
+            "provider": context.get("provider"),
+            "source": context.get("source", SOURCE_UNAVAILABLE),
+            "source_type": context.get("source_type", SOURCE_UNAVAILABLE),
             "timestamp": context.get("timestamp", _utc_iso()),
+            "observed_at": context.get("observed_at", context.get("timestamp", _utc_iso())),
+            "cache_hit": context.get("cache_hit", False),
+            "cache_age_seconds": context.get("cache_age_seconds", 0),
             "internet_ok": context.get("internet_ok", False),
             "temperature_c": context.get("temperature_c", 0.0),
             "humidity_pct": context.get("humidity_pct", 0.0),
