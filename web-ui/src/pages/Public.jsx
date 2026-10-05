@@ -11,6 +11,7 @@ import { apiFetch, getStoredAuth } from '../auth/authClient'
 import { AlertNotificationManager } from '../services/alertNotificationManager'
 import { INCIDENT_DEMO_EVENT, formatIncidentDate, impactLines, readDemoAlert } from '../services/incidentDemo'
 import { citizenRiskCopy, deriveCitizenGeofenceState, normalizeRisk } from '../services/citizenGeofence'
+import { createCitizenWeatherController, weatherFields, WEATHER_UNAVAILABLE } from '../services/citizenWeather'
 
 const STORAGE = {
   uid: 'landsense_uid',
@@ -114,6 +115,8 @@ export default function Public() {
   const [routeLoading, setRouteLoading] = useState(false)
   const [routeError, setRouteError] = useState('')
   const [weather, setWeather] = useState(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
+  const [weatherError, setWeatherError] = useState('')
   const [banner, setBanner] = useState({
     tone: 'safe',
     title: 'Safety monitoring is ready',
@@ -151,6 +154,27 @@ export default function Public() {
   const lastEvaluationAtRef = useRef(0)
   const lastNotifiedZoneRiskRef = useRef('')
   const positionEvaluationInFlightRef = useRef(false)
+  const weatherControllerRef = useRef(null)
+
+  useEffect(() => {
+    const controller = createCitizenWeatherController({
+      request: (lat, lng, signal) => fetchJson(`/citizen/weather/current?latitude=${lat}&longitude=${lng}`, { signal, cache: 'no-store' }),
+      onChange: (state) => {
+        setWeather(state.weather)
+        setWeatherLoading(state.loading)
+        setWeatherError(state.error)
+      },
+    })
+    weatherControllerRef.current = controller
+    return () => {
+      controller.dispose()
+      weatherControllerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    weatherControllerRef.current?.setLocation(location)
+  }, [location?.lat, location?.lng])
 
   const refreshTargetedAlerts = useCallback(async () => {
     if (alertRefreshInFlightRef.current) return
@@ -344,7 +368,6 @@ export default function Public() {
         prediction = await tryPredict(lat, lng)
       } catch {
         setStatusText('Unable to check configured risk zones right now. Your GPS marker remains live.')
-        setWeather(null)
         setStatus((previous) => ({ ...previous, risk: '--', recommendation: 'Risk status unavailable until geofencing can be checked.' }))
         setBanner({ tone: 'warning', title: 'RISK STATUS UNAVAILABLE', body: 'Your location is known, but configured geofencing could not be checked.' })
         return
@@ -355,7 +378,6 @@ export default function Public() {
       const geofence = deriveCitizenGeofenceState(prediction)
       const copy = citizenRiskCopy(geofence.uiRisk, geofence.activeZoneName)
       setActiveZoneId(geofence.activeZoneId)
-      setWeather(prediction?.weather || null)
       setStatus((previous) => ({
         risk: geofence.uiRisk,
         confidence: Number(prediction?.prediction?.confidence ?? previous.confidence ?? 0),
@@ -829,21 +851,12 @@ export default function Public() {
                 </div>
                 ) : null}
 
-                {weather ? (
-                  <section className="citizen-environment grid grid-cols-2 gap-3 border border-[#dfe5df] bg-white p-4">
-                    <WeatherCard label="Temperature" value={`${Number(weather.temperature_c || 0).toFixed(1)} °C`} />
-                    <WeatherCard label="Humidity" value={`${Number(weather.humidity_pct || 0).toFixed(0)}%`} />
-                    <WeatherCard label="Wind speed" value={`${Number(weather.wind_speed_mps || 0).toFixed(1)} m/s`} />
-                    <WeatherCard label="Weather" value={`${weather.weather_main || 'Unknown'}${weather.weather_description ? ` • ${weather.weather_description}` : ''}`} />
-                    <p className={`col-span-2 text-xs ${weather.source_type === 'simulated' ? 'text-amber-200' : weather.source_type === 'unavailable' ? 'text-rose-200' : 'text-slate-400'}`}>
-                      {weather.source_type === 'simulated'
-                        ? 'Estimated weather conditions are being shown.'
-                        : weather.source_type === 'unavailable'
-                          ? 'Current weather conditions are temporarily unavailable.'
-                          : 'Current weather conditions were updated recently.'}
-                    </p>
-                  </section>
-                ) : null}
+                <section aria-labelledby="citizen-weather-title" className="citizen-environment grid grid-cols-2 gap-3 border border-[#dfe5df] bg-white p-4" aria-busy={weatherLoading}>
+                  <h2 id="citizen-weather-title" className="col-span-2 text-sm font-semibold">Current weather</h2>
+                  {weatherLoading ? <p role="status" className="col-span-2 text-sm text-slate-600">Loading live weather…</p>
+                    : weatherError || !weather ? <p role="status" className="col-span-2 text-sm text-slate-600">{WEATHER_UNAVAILABLE}</p>
+                      : <>{weatherFields(weather).map(field => <WeatherCard key={field.label} label={field.label} value={field.value} />)}<p className="col-span-2 text-xs text-slate-500">Weatherbit · Current observations</p></>}
+                </section>
 
                 <section className="citizen-metrics grid grid-cols-3 border border-[#dfe5df] bg-white p-4">
                   <div className="col-span-3 mb-3 border-b border-[#dfe5df] pb-3">

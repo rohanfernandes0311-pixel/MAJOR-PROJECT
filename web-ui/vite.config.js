@@ -20,6 +20,7 @@ const proxiedPaths = [
   '/route-safe',
   '/subscribe',
   '/admin',
+  '/citizen/weather',
   '/vapid-public-key',
   '/push-public-key',
   '/public-key',
