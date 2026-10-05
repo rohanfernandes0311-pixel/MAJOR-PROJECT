@@ -12,6 +12,10 @@ import { AlertNotificationManager } from '../services/alertNotificationManager'
 import { INCIDENT_DEMO_EVENT, formatIncidentDate, impactLines, readDemoAlert } from '../services/incidentDemo'
 import { citizenRiskCopy, deriveCitizenGeofenceState, normalizeRisk } from '../services/citizenGeofence'
 import { createCitizenWeatherController, weatherFields, WEATHER_UNAVAILABLE } from '../services/citizenWeather'
+import { createCitizenEnvironmentController } from '../services/citizenEnvironment'
+import SoilMoistureCard from '../shared/SoilMoistureCard'
+import { createCitizenPrecipitationController } from '../services/citizenPrecipitation'
+import PrecipitationCard from '../shared/PrecipitationCard'
 
 const STORAGE = {
   uid: 'landsense_uid',
@@ -117,6 +121,10 @@ export default function Public() {
   const [weather, setWeather] = useState(null)
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [weatherError, setWeatherError] = useState('')
+  const [soilObservation, setSoilObservation] = useState(null)
+  const [soilLoading, setSoilLoading] = useState(false)
+  const [precipitationObservation, setPrecipitationObservation] = useState(null)
+  const [precipitationLoading, setPrecipitationLoading] = useState(false)
   const [banner, setBanner] = useState({
     tone: 'safe',
     title: 'Safety monitoring is ready',
@@ -155,6 +163,40 @@ export default function Public() {
   const lastNotifiedZoneRiskRef = useRef('')
   const positionEvaluationInFlightRef = useRef(false)
   const weatherControllerRef = useRef(null)
+  const environmentControllerRef = useRef(null)
+  const precipitationControllerRef = useRef(null)
+
+  useEffect(() => {
+    const controller = createCitizenPrecipitationController({
+      request: (lat, lng, signal) => fetchJson(`/citizen/environment/precipitation?latitude=${lat}&longitude=${lng}`, { signal, cache: 'no-store' }),
+      onChange: ({ observation, loading }) => {
+        setPrecipitationObservation(observation)
+        setPrecipitationLoading(loading)
+      },
+    })
+    precipitationControllerRef.current = controller
+    return () => { controller.dispose(); precipitationControllerRef.current = null }
+  }, [])
+
+  useEffect(() => {
+    precipitationControllerRef.current?.setLocation(location)
+  }, [location?.lat, location?.lng])
+
+  useEffect(() => {
+    const controller = createCitizenEnvironmentController({
+      request: (lat, lng, signal) => fetchJson(`/citizen/environment/current?latitude=${lat}&longitude=${lng}`, { signal, cache: 'no-store' }),
+      onChange: ({ observation, loading }) => {
+        setSoilObservation(observation)
+        setSoilLoading(loading)
+      },
+    })
+    environmentControllerRef.current = controller
+    return () => { controller.dispose(); environmentControllerRef.current = null }
+  }, [])
+
+  useEffect(() => {
+    environmentControllerRef.current?.setLocation(location)
+  }, [location?.lat, location?.lng])
 
   useEffect(() => {
     const controller = createCitizenWeatherController({
@@ -861,19 +903,15 @@ export default function Public() {
                 <section className="citizen-metrics grid grid-cols-3 border border-[#dfe5df] bg-white p-4">
                   <div className="col-span-3 mb-3 border-b border-[#dfe5df] pb-3">
                     <div className="section-kicker">Terrain conditions</div>
-                    <p className="mt-1 text-xs text-slate-500">Latest values used by the current assessment</p>
+                    <p className="mt-1 text-xs text-slate-500">Regional satellite observations, separate from risk assessment</p>
                   </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Rainfall</div>
-                    <div className="mt-2 text-xl font-semibold">{Math.round(status.rainfall)} mm</div>
-                  </div>
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Soil moisture</div>
-                    <div className="mt-2 text-xl font-semibold">{Math.round(status.soil_moisture)}%</div>
-                  </div>
+                  <PrecipitationCard observation={precipitationObservation} loading={precipitationLoading} />
+                  <SoilMoistureCard observation={soilObservation} loading={soilLoading} />
                   <div>
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Deformation</div>
                     <div className="mt-2 text-xl font-semibold">{Math.round(status.deformation)} mm</div>
+                    <div className="text-xs text-slate-600">Current model input</div>
+                    <p className="mt-2 text-xs text-slate-500">Not a live satellite measurement</p>
                   </div>
                 </section>
 

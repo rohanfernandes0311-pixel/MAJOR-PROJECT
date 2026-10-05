@@ -21,6 +21,7 @@ const proxiedPaths = [
   '/subscribe',
   '/admin',
   '/citizen/weather',
+  '/citizen/environment',
   '/vapid-public-key',
   '/push-public-key',
   '/public-key',

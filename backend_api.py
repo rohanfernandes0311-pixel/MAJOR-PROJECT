@@ -20,6 +20,7 @@ from typing import Any, Optional
 import requests
 from backend.auth.router import router as auth_router
 from backend.citizen_weather import router as citizen_weather_router
+from backend.citizen_environment import router as citizen_environment_router
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -115,6 +116,7 @@ app.include_router(auth_router)
 app.include_router(landslide_extraction_router)
 app.include_router(simulation_demonstration_router)
 app.include_router(citizen_weather_router)
+app.include_router(citizen_environment_router)
 
 app.add_middleware(
     CORSMiddleware,
