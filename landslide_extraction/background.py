@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
-
 from .extractor import extract_named_tables, extract_tabular_inventory, inspect_pdf, rows_to_csv
 from .storage import LocalExtractionStorage, job_registry
 

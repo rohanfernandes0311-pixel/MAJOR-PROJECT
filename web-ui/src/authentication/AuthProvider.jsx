@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getProfile, refreshTokens, logout as apiLogout } from "../services/authService";
+import { getProfile, refreshTokens } from "../services/authService";
 import * as tokenStorage from "../utils/tokenStorage";
 
 const AuthContext = createContext(null);

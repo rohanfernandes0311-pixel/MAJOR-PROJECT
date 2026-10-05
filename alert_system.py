@@ -23,7 +23,6 @@ import requests
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
-from typing import Optional, List
 
 # ─────────────────────────────────────────────────────────────
 # Config / Credentials  (set via environment variables)

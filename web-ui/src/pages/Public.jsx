@@ -12,7 +12,6 @@ import { AlertNotificationManager } from '../services/alertNotificationManager'
 import { INCIDENT_DEMO_EVENT, formatIncidentDate, impactLines, readDemoAlert } from '../services/incidentDemo'
 import { citizenRiskCopy, deriveCitizenGeofenceState, normalizeRisk } from '../services/citizenGeofence'
 
-const FALLBACK_LOCATION = { lat: 18.55, lng: 73.9 }
 const STORAGE = {
   uid: 'landsense_uid',
   alerts: 'landsense_alerts_enabled',

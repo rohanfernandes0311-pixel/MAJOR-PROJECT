@@ -11,7 +11,6 @@ import sys
 import tempfile
 import threading
 import time
-from urllib.parse import urlparse
 from urllib.request import urlopen
 
 import uvicorn

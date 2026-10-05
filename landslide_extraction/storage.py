@@ -4,7 +4,6 @@ import csv
 import uuid
 from pathlib import Path
 from threading import Lock
-from typing import Iterable
 
 
 class LocalExtractionStorage:

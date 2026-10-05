@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, RefreshCw, ShieldAlert, Smartphone, Sparkles } from 'lucide-react'
+import { ArrowLeft, RefreshCw, ShieldAlert, Smartphone, Sparkles } from 'lucide-react'
 import OTPInput from '../components/OTPInput'
 import Countdown from '../components/Countdown'
 import VerifyButton from '../components/VerifyButton'

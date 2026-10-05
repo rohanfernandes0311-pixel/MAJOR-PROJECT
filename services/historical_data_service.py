@@ -6,7 +6,6 @@ the synthetic dataset workflow as the default and non-breaking path.
 
 from __future__ import annotations
 
-import csv
 import json
 import zipfile
 from dataclasses import dataclass

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import tempfile
 from pathlib import Path
 from unittest import TestCase, mock
