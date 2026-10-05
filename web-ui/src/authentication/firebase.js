@@ -12,8 +12,6 @@ const firebaseConfig = {
 
 let appInstance = null;
 let authInstance = null;
-let recaptchaVerifierInstance = null;
-let recaptchaContainerId = "";
 
 function validateFirebaseConfig() {
   const required = ["apiKey", "authDomain", "projectId", "appId"];
@@ -36,31 +34,14 @@ function getFirebaseAuth() {
   return authInstance;
 }
 
-function createRecaptcha(containerId = "recaptcha-container") {
+function createRecaptcha(container) {
   if (typeof window === "undefined") return null;
-  if (recaptchaVerifierInstance && recaptchaContainerId === containerId) {
-    console.debug("[firebase] Reusing existing reCAPTCHA verifier");
-    return recaptchaVerifierInstance;
-  }
-  const container = document.getElementById(containerId);
-  if (!container) {
-    throw new Error(`reCAPTCHA container "${containerId}" was not found`);
+  if (!container?.isConnected) {
+    throw new Error("reCAPTCHA container is not mounted");
   }
   const auth = getFirebaseAuth();
-  if (recaptchaVerifierInstance && recaptchaContainerId !== containerId) {
-    recaptchaVerifierInstance.clear();
-  }
-  // Returns an invisible recaptcha instance attached to the DOM container id
-  recaptchaVerifierInstance = new RecaptchaVerifier(containerId, { size: "invisible" }, auth);
-  recaptchaContainerId = containerId;
-  console.debug("[firebase] reCAPTCHA verifier created", { containerId });
-  return recaptchaVerifierInstance;
+  console.debug("[firebase] Creating page-scoped reCAPTCHA verifier");
+  return new RecaptchaVerifier(container, { size: "invisible" }, auth);
 }
 
-function resetRecaptcha() {
-  if (recaptchaVerifierInstance) recaptchaVerifierInstance.clear();
-  recaptchaVerifierInstance = null;
-  recaptchaContainerId = "";
-}
-
-export { createRecaptcha, getFirebaseAuth, resetRecaptcha };
+export { createRecaptcha, getFirebaseAuth };

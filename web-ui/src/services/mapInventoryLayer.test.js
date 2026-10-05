@@ -7,6 +7,6 @@ test('Leaflet map renders a distinct explicitly dataset-backed inventory layer',
 
   assert.match(source, /L\.layerGroup\(\)/)
   assert.match(source, /Dataset-backed landslide inventory/)
-  assert.match(source, /Configured risk zone/)
+  assert.match(source, /CONFIGURED · Risk zone/)
   assert.match(source, /landslideRecords/)
 })

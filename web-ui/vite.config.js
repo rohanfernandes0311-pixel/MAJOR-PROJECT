@@ -19,7 +19,7 @@ const proxiedPaths = [
   '/location-update',
   '/route-safe',
   '/subscribe',
-  '/admin/simulation',
+  '/admin',
   '/vapid-public-key',
   '/push-public-key',
   '/public-key',

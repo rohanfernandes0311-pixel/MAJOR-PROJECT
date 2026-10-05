@@ -28,7 +28,7 @@ test('GPS updates replace only the user layer and center only once', async () =>
   assert.match(source, /userLocationLayerRef\.current\?\.remove/)
   assert.match(source, /hasCenteredOnUserRef\.current/)
   assert.match(source, /\}, \[userLocation, userLocationStatus\]\)/)
-  const mapLifecycleDependencies = source.match(/\}, \[zones, simulatedLocation[^\n]+landslideRecords\]\)/)?.[0] || ''
+  const mapLifecycleDependencies = source.match(/\}, \[zones, simulatedLocation[^\n]+landslideRecords, simulationSafeZone, adminSimulationActor\]\)/)?.[0] || ''
   assert.ok(mapLifecycleDependencies)
   assert.doesNotMatch(mapLifecycleDependencies, /userLocation/)
 })
@@ -41,12 +41,12 @@ test('Leaflet initialization uses the latest GPS fix when location arrives befor
   assert.match(source, /renderUserLocationLayer\([\s\S]*currentUserLocation,[\s\S]*latestUserLocationStatusRef\.current/)
   assert.match(source, /if\(cancelled \|\| !ref\.current\) return/)
   assert.match(source, /map\.setView\(\[currentUserLocation\.lat, currentUserLocation\.lng\], 15/)
-  assert.match(source, /hasValidUserLocation \? [\s\S]*Real user location/)
+  assert.match(source, /hasValidUserLocation \? [\s\S]*REAL · GPS location/)
 })
 
 test('configured GeoJSON geofences retain severity styling and expose zone popups', async () => {
   const source = await readFile(new URL('../shared/MapView.jsx', import.meta.url), 'utf8')
-  assert.match(source, /features: incidentLocation \? \[\] : zones/)
+  assert.match(source, /features: incidentMode \? \[\] : zones/)
   assert.match(source, /getFeatureStyle\(feature, currentRiskStyle\)/)
   assert.match(source, /<b>LandSense Risk Zone<\/b>/)
   assert.match(source, /Risk Level:/)

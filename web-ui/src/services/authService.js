@@ -1,4 +1,5 @@
-import { createRecaptcha, getFirebaseAuth, resetRecaptcha } from "../authentication/firebase";
+import { getFirebaseAuth } from "../authentication/firebase";
+import { STALE_RECAPTCHA_CODE, isStaleRecaptchaError } from "../authentication/recaptchaLifecycle";
 import { signInWithPhoneNumber } from "firebase/auth";
 
 const FIREBASE_SIGNIN_KEY = "landsense_firebase_signin_active";
@@ -34,8 +35,8 @@ function parseBackendDetail(text) {
 function toFriendlyAuthError(err, fallbackMessage) {
   const code = String(err?.code || "");
   const message = String(err?.message || "");
-  if (code.includes("auth/invalid-verification-code")) return "Invalid OTP. Please check the code and try again.";
-  if (code.includes("auth/code-expired")) return "OTP expired. Please request a new OTP.";
+  if (code.includes("auth/invalid-verification-code")) return "Invalid verification code.";
+  if (code.includes("auth/code-expired")) return "Verification code expired. Please request a new code.";
   if (code.includes("auth/too-many-requests")) return "Too many attempts. Please wait and try again.";
   if (code.includes("auth/missing-phone-number")) return "Phone number is missing. Please enter it again.";
   if (code.includes("auth/invalid-phone-number")) return "Invalid phone number format.";
@@ -48,11 +49,11 @@ function toFriendlyAuthError(err, fallbackMessage) {
   return message || fallbackMessage;
 }
 
-async function startPhoneSignIn(phoneNumber, containerId = "recaptcha-container") {
+async function startPhoneSignIn(phoneNumber, verifier) {
   try {
+    if (!verifier) throw new Error("reCAPTCHA container is not mounted");
     const auth = getFirebaseAuth();
     console.debug("[authService] Firebase auth instance ready");
-    const verifier = createRecaptcha(containerId);
     console.debug("[authService] Calling signInWithPhoneNumber");
     const result = await signInWithPhoneNumber(auth, phoneNumber, verifier);
     confirmationResultRef = result;
@@ -63,7 +64,13 @@ async function startPhoneSignIn(phoneNumber, containerId = "recaptcha-container"
     return true;
   } catch (err) {
     console.error("[authService] startPhoneSignIn failed", err);
-    throw new Error(toFriendlyAuthError(err, "Unable to send OTP right now."));
+    const friendly = new Error(
+      isStaleRecaptchaError(err)
+        ? "Verification security check expired. Please try again."
+        : toFriendlyAuthError(err, "Unable to send OTP right now.")
+    );
+    if (isStaleRecaptchaError(err)) friendly.code = STALE_RECAPTCHA_CODE;
+    throw friendly;
   }
 }
 
@@ -72,7 +79,6 @@ function resetPhoneSignIn() {
   confirmInFlight = false;
   if (typeof window !== "undefined") window.__confirmationResult = null;
   clearPendingFirebaseSignIn();
-  resetRecaptcha();
 }
 
 async function confirmOtpAndExchange(otp) {
@@ -96,7 +102,14 @@ async function confirmOtpAndExchange(otp) {
     });
     if (!resp.ok) {
       const txt = await resp.text();
-      throw new Error(parseBackendDetail(txt) || txt || "Exchange failed");
+      const detail = parseBackendDetail(txt);
+      if (resp.status >= 500) {
+        throw new Error("Unable to complete sign-in right now. Please try again.");
+      }
+      if (resp.status === 401) {
+        throw new Error("Firebase authentication could not be verified. Please sign in again.");
+      }
+      throw new Error(detail || "Unable to complete sign-in right now. Please try again.");
     }
     const data = await resp.json();
     try {

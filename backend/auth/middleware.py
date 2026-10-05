@@ -81,6 +81,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     EXEMPT_PATHS = {
         "/",
         "/admin",
+        "/admin/simulation",
+        "/admin/simulation/demo",
+        "/frontend/admin/simulation",
+        "/frontend/admin/simulation/demo",
         "/demo",
         "/frontend",
         "/frontend/index.html",

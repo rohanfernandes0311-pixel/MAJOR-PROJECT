@@ -8,6 +8,7 @@ import OTP from './pages/OTP'
 import Public from './pages/Public'
 import Admin from './pages/Admin'
 import DemoMode from './pages/DemoMode'
+import SimulationDemo from './pages/SimulationDemo'
 
 export default function App(){
   return (
@@ -24,6 +25,10 @@ export default function App(){
           <Route path="/frontend" element={<AuthGate><Public/></AuthGate>} />
           <Route path="/frontend/index.html" element={<AuthGate><Public/></AuthGate>} />
           <Route path="/admin" element={<ProtectedRoute role="Admin"><Admin/></ProtectedRoute>} />
+          <Route path="/admin/simulation" element={<ProtectedRoute role="Admin"><SimulationDemo/></ProtectedRoute>} />
+          <Route path="/frontend/admin/simulation" element={<ProtectedRoute role="Admin"><SimulationDemo/></ProtectedRoute>} />
+          <Route path="/admin/simulation/demo" element={<ProtectedRoute role="Admin"><SimulationDemo/></ProtectedRoute>} />
+          <Route path="/frontend/admin/simulation/demo" element={<ProtectedRoute role="Admin"><SimulationDemo/></ProtectedRoute>} />
           <Route path="/frontend/admin" element={<ProtectedRoute role="Admin"><Admin/></ProtectedRoute>} />
           <Route path="/demo" element={<ProtectedRoute role="Admin"><DemoMode/></ProtectedRoute>} />
           <Route path="/frontend/demo" element={<ProtectedRoute role="Admin"><DemoMode/></ProtectedRoute>} />

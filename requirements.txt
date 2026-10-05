@@ -14,6 +14,9 @@ streamlit
 fastapi
 uvicorn
 pydantic
+SQLAlchemy>=2.0,<2.1
+psycopg[binary]>=3.2,<4
+python-dotenv>=1.0,<2
 firebase-admin
 PyJWT
 pdfplumber
@@ -21,6 +24,7 @@ pypdf
 
 # Integrations & Utilities
 requests
+openpyxl>=3.1,<4
 twilio
 
 # Optional for Phase 2:

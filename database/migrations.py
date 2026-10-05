@@ -12,6 +12,7 @@ from database.models import (
     LocationEvent,
     LoginHistory,
     OTPSession,
+    AuditEvent,
 )
 from database.connection import Base
 

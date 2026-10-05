@@ -19,7 +19,7 @@ function safeJsonParse(value) {
   }
 }
 
-export function apiFetch(path, options = {}, token = '') {
+export function apiFetch(path, options = {}, token = '', responseType = 'json') {
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {})
@@ -29,7 +29,7 @@ export function apiFetch(path, options = {}, token = '') {
     ...options,
     headers
   }).then(async (response) => {
-    if (response.ok) return response.json()
+    if (response.ok) return responseType === 'blob' ? response.blob() : response.json()
 
     // Try automatic refresh on 401 using stored refresh token
     if (response.status === 401) {
@@ -48,7 +48,7 @@ export function apiFetch(path, options = {}, token = '') {
             // retry original request with new token
             const retryHeaders = { ...headers, Authorization: `Bearer ${data.access_token}` }
             const retry = await fetch(`${API_BASE}${path}`, { ...options, headers: retryHeaders })
-            if (retry.ok) return retry.json()
+            if (retry.ok) return responseType === 'blob' ? retry.blob() : retry.json()
           }
         } catch (err) {
           // fallthrough to clear session

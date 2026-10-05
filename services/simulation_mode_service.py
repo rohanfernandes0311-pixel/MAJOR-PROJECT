@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import threading
+import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,6 +11,10 @@ from typing import Any
 
 RISK_SCORE = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 ALLOWED_FORCED_RISKS = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+KODAGU_SIMULATION_RISKS = {"HIGH", "CRITICAL"}
+KODAGU_LOCATIONS = (
+    "Madikeri", "Virajpet", "Chittalli", "Perumbadi", "Makutta",
+)
 
 
 def _utc_iso() -> str:
@@ -38,6 +43,17 @@ class SimulationState:
     danger_zone_name: str | None = None
     danger_latitude: float | None = None
     danger_longitude: float | None = None
+    is_simulation: bool = False
+    location: str | None = None
+    synthetic_zone: dict[str, Any] | None = None
+    geometry_status: str = "not_created"
+    alert_preview: dict[str, Any] | None = None
+    recipients: list[dict[str, Any]] | None = None
+    selected_recipient_ids: list[str] | None = None
+    affected_registered_users: int = 0
+    sms_eligible_users: int = 0
+    route: dict[str, Any] | None = None
+    triggered: bool = False
 
 
 class SimulationModeService:
@@ -95,7 +111,7 @@ class SimulationModeService:
 
     def apply_location_override(self, latitude: float, longitude: float) -> dict[str, Any]:
         state = self.read_state()
-        if not state["enabled"]:
+        if not state["enabled"] or state.get("is_simulation"):
             return {
                 "enabled": False,
                 "latitude": latitude,
@@ -110,6 +126,118 @@ class SimulationModeService:
             "zone_name": state.get("danger_zone_name"),
             "scenario_name": state.get("scenario_name"),
         }
+
+    def create_kodagu(self, *, location: str, risk: str, verified_feature: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Create isolated admin demo state without manufacturing geography.
+
+        Geometry is copied only from an existing exact-name configured feature. When
+        none exists the simulation remains usable as an alert preview and reports
+        geometry/route/recipient calculation as unavailable.
+        """
+        clean_location = str(location or "").strip()
+        clean_risk = str(risk or "").strip().upper()
+        if clean_location not in KODAGU_LOCATIONS:
+            raise ValueError("Unsupported Kodagu simulation location.")
+        if clean_risk not in KODAGU_SIMULATION_RISKS:
+            raise ValueError("Simulation Risk Level must be HIGH or CRITICAL.")
+
+        geometry = None
+        if verified_feature and str((verified_feature.get("properties") or {}).get("name") or "").strip() == clean_location:
+            candidate = verified_feature.get("geometry") or {}
+            if candidate.get("type") == "Polygon" and candidate.get("coordinates"):
+                geometry = candidate
+        zone = None
+        if geometry:
+            zone = {
+                "type": "Feature",
+                "properties": {
+                    "zone_id": f"KODAGU-SIM-{KODAGU_LOCATIONS.index(clean_location) + 1:02d}",
+                    "name": clean_location,
+                    "risk_level": clean_risk,
+                    "risk_label": "LandSense Simulation Risk Level",
+                    "is_simulation": True,
+                    "synthetic": True,
+                    "source_geometry": "existing_project_verified_geometry",
+                },
+                "geometry": geometry,
+            }
+        message = self._kodagu_message(clean_risk, clean_location)
+        with self._lock:
+            self._state = SimulationState(
+                enabled=True,
+                forced_risk=clean_risk,
+                scenario_name=f"Kodagu / {clean_location}",
+                enabled_at_utc=_utc_iso(),
+                danger_zone_id=(zone or {}).get("properties", {}).get("zone_id"),
+                danger_zone_name=clean_location,
+                is_simulation=True,
+                location=clean_location,
+                synthetic_zone=zone,
+                geometry_status="synthetic_from_verified_project_geometry" if zone else "unavailable_no_verified_geometry",
+                alert_preview={"risk": clean_risk, "location": clean_location, "message": message, "recipients": 0},
+                recipients=[],
+                route={"status": "unavailable", "message": "Demo route unavailable: verified geometry and a safe destination are required."},
+            )
+            snapshot = self._snapshot_locked()
+        self.record_event("kodagu_simulation_created", {"location": clean_location, "risk": clean_risk, "is_simulation": True, "geometry_status": snapshot["geometry_status"]})
+        return snapshot
+
+    def set_kodagu_results(self, *, recipients: list[dict[str, Any]], sms_eligible_users: int, route: dict[str, Any] | None) -> dict[str, Any]:
+        with self._lock:
+            self._state.recipients = recipients
+            self._state.affected_registered_users = len(recipients)
+            self._state.sms_eligible_users = int(sms_eligible_users)
+            if self._state.alert_preview is not None:
+                self._state.alert_preview["recipients"] = len(recipients)
+            if route is not None:
+                self._state.route = route
+            return self._snapshot_locked()
+
+    @staticmethod
+    def admin_actor(location: str, risk: str, position: list[float] | None, feature: dict[str, Any]) -> dict[str, Any]:
+        """Validate an existing simulation position without deriving or persisting GPS."""
+        from geofencing import point_in_polygon
+        unavailable = {"status": "unavailable", "is_simulation": True,
+                       "message": "Admin simulation actor unavailable: no existing position verified inside this simulation zone."}
+        if location not in KODAGU_LOCATIONS or risk not in KODAGU_SIMULATION_RISKS:
+            return unavailable
+        geometry = feature.get("geometry") or {}
+        rings = geometry.get("coordinates") or []
+        try:
+            if geometry.get("type") != "Polygon" or not rings or not position or len(position) != 2:
+                return unavailable
+            latitude, longitude = position
+            if not all(math.isfinite(value) for value in position) or not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+                return unavailable
+            if not point_in_polygon(latitude, longitude, rings[0]) or any(point_in_polygon(latitude, longitude, hole) for hole in rings[1:]):
+                return unavailable
+        except (TypeError, ValueError, IndexError):
+            return unavailable
+        return {"status": "available", "label": "ADMIN SIMULATION ACTOR", "is_simulation": True,
+                "location": location, "risk": risk, "latitude": latitude, "longitude": longitude,
+                "source": "existing_simulation_location_center", "recipientEligible": False}
+
+    def trigger_kodagu(self, recipient_ids: list[str] | None = None) -> dict[str, Any]:
+        with self._lock:
+            if not self._state.enabled or not self._state.is_simulation:
+                raise ValueError("Create a Kodagu simulation before triggering the preview.")
+            allowed = {str(item.get("display_id")) for item in (self._state.recipients or []) if item.get("sms_eligible")}
+            selected = list(dict.fromkeys(str(value) for value in (recipient_ids or []) if str(value) in allowed))
+            self._state.selected_recipient_ids = selected
+            if self._state.alert_preview is not None:
+                self._state.alert_preview["recipients"] = len(selected)
+            self._state.triggered = True
+            snapshot = self._snapshot_locked()
+        self.record_event("kodagu_simulation_preview_confirmed", {"location": snapshot["location"], "risk": snapshot["effective_risk"], "external_notifications_sent": 0})
+        return snapshot
+
+    @staticmethod
+    def _kodagu_message(risk: str, location: str) -> str:
+        if risk == "HIGH":
+            guidance = "Please stay alert, avoid unstable slopes, and follow the recommended safer route."
+        else:
+            guidance = "Move away from unstable slopes and follow the recommended safer route."
+        return f"LANDsense SIMULATION ALERT: {risk.title()} landslide risk simulated in {location}. {guidance}"
 
     def effective_forced_risk(self) -> str:
         with self._lock:
@@ -162,6 +290,17 @@ class SimulationModeService:
             "danger_latitude": self._state.danger_latitude,
             "danger_longitude": self._state.danger_longitude,
             "external_notifications_suppressed": self._should_suppress_external_notifications_locked(),
+            "is_simulation": self._state.is_simulation,
+            "location": self._state.location,
+            "synthetic_zone": self._state.synthetic_zone,
+            "geometry_status": self._state.geometry_status,
+            "alert_preview": self._state.alert_preview,
+            "recipients": list(self._state.recipients or []),
+            "selected_recipient_ids": list(self._state.selected_recipient_ids or []),
+            "affected_registered_users": self._state.affected_registered_users,
+            "sms_eligible_users": self._state.sms_eligible_users,
+            "route": self._state.route,
+            "triggered": self._state.triggered,
         }
 
     def _effective_forced_risk_locked(self) -> str:

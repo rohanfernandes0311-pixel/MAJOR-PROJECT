@@ -68,13 +68,13 @@ test('admin uses separate configured and incident state and demo launch has no n
 
 test('map keeps real GPS, simulated citizens, incident marker, and affected area distinct', async () => {
   const source = await readFile(new URL('../shared/MapView.jsx', import.meta.url), 'utf8')
-  assert.match(source, /userLocation = null, userLocationStatus = '', simulatedLocation = null, simulatedCitizens = \[\], incidentLocation = null/)
+  assert.match(source, /userLocation = null, userLocationStatus = '', simulatedLocation = null, simulatedCitizens = EMPTY_LAYERS, incidentLocation = null/)
   assert.match(source, /bindTooltip\('🔵 YOU ARE HERE'/)
   assert.match(source, /SIMULATED CITIZEN/)
-  assert.match(source, /DEMO INCIDENT — affected area/)
+  assert.match(source, /circular affected area/)
   assert.match(source, /map\.setView\(\[incidentLocation\.lat, incidentLocation\.lng\]/)
   assert.match(source, /radius: Number\(incidentRadiusMeters\)/)
-  assert.match(source, /features: incidentLocation \? \[\] : zones/)
+  assert.match(source, /features: incidentMode \? \[\] : zones/)
   assert.doesNotMatch(source, /L\.rectangle\(/)
 
   const citizen = await readFile(new URL('../pages/Public.jsx', import.meta.url), 'utf8')

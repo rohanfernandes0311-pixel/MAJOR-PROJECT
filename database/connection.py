@@ -1,17 +1,25 @@
 import os
+import logging
+from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BASE_DIR / ".env")
+
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL must be configured for PostgreSQL/Neon runtime persistence")
 
-# Keep connection options centralized for the PostgreSQL runtime engine.
-connect_args = {}
+# Keep connection options centralized for the PostgreSQL runtime engine.  The
+# timeout applies to establishing a connection; it does not weaken Neon TLS or
+# alter URL options such as sslmode/channel_binding.
+CONNECT_TIMEOUT_SECONDS = 10
+connect_args = {"connect_timeout": CONNECT_TIMEOUT_SECONDS}
 
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(
@@ -31,6 +39,16 @@ engine = create_engine(
     DATABASE_URL,
     connect_args=connect_args,
     pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=5,
+    max_overflow=10,
+)
+
+logger.info(
+    "Database configured: host=%s database=%s pooler=%s",
+    engine.url.host or "unknown",
+    engine.url.database or "unknown",
+    bool(engine.url.host and "-pooler" in engine.url.host),
 )
 
 

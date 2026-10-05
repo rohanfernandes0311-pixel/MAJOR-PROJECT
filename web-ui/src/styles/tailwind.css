@@ -2,17 +2,261 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Basic theme tokens to match design direction */
-:root{
-  --bg-dark: #07101a;
+/* LandSense shared visual language: restrained, legible, and operational. */
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ls-canvas: #f4f6f3;
+  --ls-surface: #ffffff;
+  --ls-surface-muted: #f8faf8;
+  --ls-border: #d8e0dd;
+  --ls-text: #17212b;
+  --ls-secondary: #46545e;
+  --ls-muted: #64727c;
+  --ls-primary: #2f5d50;
 }
 
-html,body,#root{height:100%}
-body{background:var(--bg-dark)}
-
-.landsense-pulse {
-  animation: landsensePulse 2.6s ease-in-out infinite;
+html, body, #root { min-height: 100%; }
+body { margin: 0; background: var(--ls-canvas); color: var(--ls-text); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(31, 93, 66, 0.22);
+  outline-offset: 2px;
 }
+
+.auth-shell, .citizen-shell { min-height: 100vh; background: var(--ls-canvas) !important; color: var(--ls-text) !important; }
+.auth-shell.login-shell {
+  background-color: #f2f5f0 !important;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%238fa092' stroke-width='1.2' stroke-opacity='.11'%3E%3Cpath d='M-80 170C95 70 215 248 390 145S680 40 842 146'/%3E%3Cpath d='M-70 207C112 111 229 286 405 181S699 78 867 181'/%3E%3Cpath d='M1180 90c118 72 119 181 252 211s186-38 244-9'/%3E%3Cpath d='M1151 126c126 76 131 190 270 223s194-39 262-7'/%3E%3Cpath d='M-95 734c181-108 314-55 431 43s245 92 372 28'/%3E%3Cpath d='M-101 780c190-112 333-58 454 44s255 96 388 29'/%3E%3C/g%3E%3Cg fill='%237d927f'%3E%3Cpath fill-opacity='.055' d='M0 690C168 590 292 606 430 669c158 72 272 47 416-42 164-101 305-96 459 7 116 78 207 73 295 24v242H0Z'/%3E%3Cpath fill-opacity='.04' d='M0 757c174-69 317-72 472-7 150 63 277 58 424-5 190-82 377-61 704 51v104H0Z'/%3E%3Cg fill-opacity='.07'%3E%3Cpath d='m42 787 24-47 24 47H76l18 35H38l18-35Z'/%3E%3Cpath d='m112 812 18-35 18 35h-10l14 27h-44l14-27Z'/%3E%3Cpath d='m1511 786 25-49 25 49h-14l19 37h-60l19-37Z'/%3E%3Cpath d='m1450 817 18-36 18 36h-10l14 28h-44l14-28Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 50% 43%, rgba(255, 255, 255, .94) 0, rgba(250, 251, 248, .80) 42%, transparent 74%),
+    linear-gradient(145deg, #e8eee6 0%, #f2f5f0 34%, #fafbf8 58%, #edf2eb 100%) !important;
+  background-position: center, center, center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
+.ls-card { border: 1px solid var(--ls-border); background: var(--ls-surface); border-radius: .5rem; box-shadow: 0 1px 2px rgba(15, 35, 23, 0.04); }
+
+/* Existing feature components retain behavior while inheriting the refined palette. */
+.auth-shell [class*="bg-[#"], .citizen-shell [class*="bg-[#"], .admin-shell [class*="bg-[#"] { background-color: var(--ls-surface) !important; }
+.auth-shell .bg-white\/5, .auth-shell .bg-black\/20,
+.citizen-shell .bg-white\/5, .citizen-shell .bg-white\/\[0\.03\], .citizen-shell .bg-white\/6, .citizen-shell .bg-black\/20,
+.admin-shell .bg-white\/5, .admin-shell .bg-white\/\[0\.03\], .admin-shell .bg-black\/20, .admin-shell .bg-black\/15, .admin-shell .bg-black\/10 { background-color: var(--ls-surface-muted) !important; }
+.auth-shell .border-white\/10, .auth-shell .border-white\/15,
+.citizen-shell .border-white\/5, .citizen-shell .border-white\/8, .citizen-shell .border-white\/10, .citizen-shell .border-white\/15,
+.admin-shell .border-white\/5, .admin-shell .border-white\/8, .admin-shell .border-white\/10, .admin-shell .border-white\/15 { border-color: var(--ls-border) !important; }
+.auth-shell .text-white, .auth-shell .text-slate-100, .auth-shell .text-slate-200,
+.citizen-shell .text-white, .citizen-shell .text-slate-100, .citizen-shell .text-slate-200,
+.admin-shell .text-white, .admin-shell .text-slate-100, .admin-shell .text-slate-200 { color: var(--ls-text) !important; }
+.auth-shell .text-slate-300, .auth-shell .text-slate-400,
+.citizen-shell .text-slate-300, .citizen-shell .text-slate-400,
+.admin-shell .text-slate-300, .admin-shell .text-slate-400 { color: var(--ls-muted) !important; }
+.auth-shell .text-cyan-100, .auth-shell .text-cyan-200,
+.citizen-shell .text-cyan-100, .citizen-shell .text-cyan-200,
+.admin-shell .text-cyan-100, .admin-shell .text-cyan-200, .admin-shell .text-violet-200 { color: var(--ls-primary) !important; }
+.citizen-shell .shadow-2xl, .admin-shell .shadow-2xl { box-shadow: 0 1px 3px rgba(15, 35, 23, 0.08) !important; }
+
+/* Citizen readability. Keep opacity on decoration only, never on text-bearing parents. */
+.citizen-shell { color: var(--ls-text) !important; }
+.citizen-shell h1, .citizen-shell h2, .citizen-shell h3, .citizen-shell h4,
+.citizen-shell b, .citizen-shell strong, .citizen-shell label,
+.citizen-shell .text-slate-950, .citizen-shell .text-slate-900,
+.citizen-shell .text-slate-800, .citizen-shell .text-slate-700 { color: var(--ls-text) !important; }
+.citizen-shell .text-slate-600, .citizen-shell .text-slate-300,
+.citizen-shell .text-slate-200\/90, .citizen-shell .text-white\/90,
+.citizen-shell .text-white\/65 { color: var(--ls-secondary) !important; }
+.citizen-shell .text-slate-500, .citizen-shell .text-slate-400 { color: var(--ls-muted) !important; }
+.citizen-shell .text-cyan-50, .citizen-shell .text-cyan-100, .citizen-shell .text-cyan-200,
+.citizen-shell .text-emerald-50, .citizen-shell .text-emerald-100, .citizen-shell .text-emerald-200 { color: #2f5d50 !important; }
+.citizen-shell .text-amber-50, .citizen-shell .text-amber-100, .citizen-shell .text-amber-200,
+.citizen-shell .text-orange-50, .citizen-shell .text-orange-100, .citizen-shell .text-orange-200 { color: #8a5d00 !important; }
+.citizen-shell .text-red-50, .citizen-shell .text-red-100, .citizen-shell .text-red-200,
+.citizen-shell .text-rose-50, .citizen-shell .text-rose-100, .citizen-shell .text-rose-200 { color: #963737 !important; }
+.citizen-shell button:disabled { opacity: .72 !important; background-color: #eef2f0 !important; border-color: #c9d2ce !important; color: #46545e !important; }
+.citizen-shell input:disabled, .citizen-shell select:disabled, .citizen-shell textarea:disabled { opacity: .72 !important; color: #46545e !important; }
+.citizen-shell ::placeholder { color: #64727c !important; opacity: 1; }
+.citizen-secondary-action { border-color: #b9c9bf; background: #fff; color: #2f5d50; }
+.citizen-secondary-action:hover { background: #eaf1ed; }
+.safety-status-label { color: #2f5d50; }
+.safety-status-value { color: #17212b; }
+.citizen-shell .map-legend { background: rgba(15, 23, 42, .94) !important; border-color: rgba(255,255,255,.3) !important; color: #f8fafc !important; }
+.citizen-shell .map-legend * { color: inherit !important; opacity: 1 !important; }
+.citizen-shell .map-legend > div:first-child { color: #ecfdf5 !important; }
+.risk-card[data-risk="SAFE"], .risk-card[data-risk="LOW"] { background: #f3f8f5; }
+.risk-card[data-risk="MEDIUM RISK"], .risk-card[data-risk="MEDIUM"] { background: #fff9eb; }
+.risk-card[data-risk="HIGH RISK"], .risk-card[data-risk="HIGH"] { background: #fff3f1; }
+.risk-card[data-risk="CRITICAL RISK"], .risk-card[data-risk="CRITICAL"] { background: #fceaea; }
+.risk-card[data-risk="SAFE"] .risk-card-value, .risk-card[data-risk="LOW"] .risk-card-value { color: #2f5d50; }
+.risk-card[data-risk="MEDIUM RISK"] .risk-card-value, .risk-card[data-risk="MEDIUM"] .risk-card-value { color: #8a5d00; }
+.risk-card[data-risk="HIGH RISK"] .risk-card-value, .risk-card[data-risk="HIGH"] .risk-card-value,
+.risk-card[data-risk="CRITICAL RISK"] .risk-card-value, .risk-card[data-risk="CRITICAL"] .risk-card-value { color: #963737; }
+
+.admin-shell { min-height: 100vh; background: #f1f4f2 !important; color: var(--ls-text) !important; }
+.admin-shell table { background: var(--ls-surface); }
+.admin-shell th { color: #536158 !important; font-weight: 600; }
+.admin-shell input, .admin-shell select, .admin-shell textarea { background: #fff !important; color: var(--ls-text) !important; border-color: #cfd8d1 !important; }
+.auth-shell .ls-brand-mark, .admin-shell .ls-brand-mark,
+.auth-shell .ls-primary-action, .admin-shell .ls-primary-action, .citizen-shell .ls-primary-action {
+  background: var(--ls-primary) !important;
+  background-image: none !important;
+  color: #fff !important;
+}
+.auth-shell .ls-primary-action:hover, .admin-shell .ls-primary-action:hover, .citizen-shell .ls-primary-action:hover { background: #174832 !important; }
+.admin-shell .bg-cyan-300, .citizen-shell .bg-cyan-300 { background-color: var(--ls-primary) !important; color: #fff !important; }
+
+.admin-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 1rem; align-items: start; }
+.admin-sidebar { position: sticky; top: 1rem; border: 1px solid var(--ls-border); background: #fff; }
+.admin-sidebar-brand { display: flex; align-items: center; gap: .6rem; border-bottom: 1px solid var(--ls-border); padding: 1rem; color: #174832; font-size: .95rem; font-weight: 750; }
+.admin-terrain-mark { width: 18px; height: 14px; border-left: 2px solid #1f5d42; border-bottom: 2px solid #1f5d42; transform: skew(-18deg); }
+.admin-sidebar nav { display: grid; padding: .5rem; }
+.admin-sidebar nav a { border-radius: .25rem; padding: .65rem .7rem; color: #536158; font-size: .82rem; font-weight: 550; }
+.admin-sidebar nav a:hover { background: #eef3ef; color: #174832; }
+.admin-content { display: flex; min-width: 0; flex-direction: column; }
+.admin-content > * { order: 3; }
+.admin-page-header { order: 0 !important; border-radius: .5rem; }
+.admin-overview { order: 1 !important; border-radius: .5rem; }
+.admin-map-section { order: 2 !important; }
+.admin-summary-item + .admin-summary-item { border-left: 1px solid var(--ls-border); }
+.admin-simulation, .admin-risk-zones, .admin-operations-panel,
+.admin-map-section > div, .admin-content > section { border-radius: .5rem !important; box-shadow: none !important; }
+.admin-map-section > div:first-child { padding: .75rem !important; }
+.admin-shell .rounded-3xl { border-radius: .5rem !important; }
+.admin-shell .rounded-2xl { border-radius: .5rem !important; }
+.admin-intelligence-card { border-left: 4px solid #2f5d50 !important; background: #fbfcfb !important; }
+.admin-environmental-signals { gap: 0 !important; border-block: 1px solid var(--ls-border); }
+.admin-environmental-signals .admin-signal { border: 0 !important; border-left: 1px solid var(--ls-border) !important; border-radius: 0 !important; background: transparent !important; }
+.admin-environmental-signals .admin-signal:first-child { border-left: 0 !important; }
+.admin-decision-card { border-left: 4px solid #9a6700 !important; background: #fffdf8 !important; }
+.admin-alert-stream { border-top: 3px solid #2f5d50 !important; }
+
+/* Admin light-theme contrast normalization. Legacy utility classes came from the
+   former dark dashboard and must not produce pale text on light surfaces. */
+.admin-shell { color: #17212b !important; }
+.admin-shell h1, .admin-shell h2, .admin-shell h3, .admin-shell h4,
+.admin-shell b, .admin-shell strong, .admin-shell th, .admin-shell legend,
+.admin-shell summary { color: #17212b; }
+.admin-shell .text-slate-950, .admin-shell .text-slate-900,
+.admin-shell .text-slate-800, .admin-shell .text-slate-700,
+.admin-shell .text-white, .admin-shell .text-slate-100,
+.admin-shell .text-slate-200 { color: #17212b !important; }
+.admin-shell .text-slate-300, .admin-shell .text-slate-400 { color: #52616b !important; }
+.admin-shell .text-slate-500, .admin-shell .text-slate-600 { color: #6b7780 !important; }
+.admin-shell .text-cyan-50, .admin-shell .text-cyan-100, .admin-shell .text-cyan-200,
+.admin-shell .text-violet-50, .admin-shell .text-violet-100, .admin-shell .text-violet-200,
+.admin-shell .text-emerald-50, .admin-shell .text-emerald-100, .admin-shell .text-emerald-200 { color: #2f5d50 !important; }
+.admin-shell .text-amber-50, .admin-shell .text-amber-100, .admin-shell .text-amber-200,
+.admin-shell .text-amber-700, .admin-shell .text-orange-50,
+.admin-shell .text-orange-100, .admin-shell .text-orange-200 { color: #9a6700 !important; }
+.admin-shell .text-red-50, .admin-shell .text-red-100, .admin-shell .text-red-200,
+.admin-shell .text-rose-50, .admin-shell .text-rose-100, .admin-shell .text-rose-200 { color: #a33a3a !important; }
+
+.admin-shell .bg-orange-400\/5, .admin-shell .bg-orange-400\/10,
+.admin-shell .bg-orange-400\/15 { background-color: #fff8f1 !important; }
+.admin-shell .border-orange-300\/10, .admin-shell .border-orange-300\/20,
+.admin-shell .border-orange-300\/25, .admin-shell .border-orange-300\/30 { border-color: #e8d7c5 !important; }
+.admin-shell .bg-amber-200\/10, .admin-shell .bg-amber-300\/10,
+.admin-shell .bg-amber-400\/10, .admin-shell .bg-amber-400\/15 { background-color: #fff7e3 !important; }
+.admin-shell .border-amber-200\/30, .admin-shell .border-amber-300\/20,
+.admin-shell .border-amber-300\/25, .admin-shell .border-amber-300\/30,
+.admin-shell .border-amber-300\/40 { border-color: #dec787 !important; }
+.admin-shell .bg-red-400\/10, .admin-shell .bg-red-400\/15,
+.admin-shell .bg-red-500\/10, .admin-shell .bg-rose-400\/10 { background-color: #fceaea !important; }
+.admin-shell .border-red-200\/30, .admin-shell .border-red-300\/35,
+.admin-shell .border-rose-300\/25, .admin-shell .border-rose-300\/30,
+.admin-shell .border-rose-300\/40 { border-color: #e7b5b5 !important; }
+.admin-shell .bg-emerald-400\/5, .admin-shell .bg-emerald-400\/10,
+.admin-shell .bg-emerald-400\/\[0\.03\] { background-color: #eff6f2 !important; }
+.admin-shell .border-emerald-300\/15, .admin-shell .border-emerald-300\/20,
+.admin-shell .border-emerald-300\/25 { border-color: #bdd3c7 !important; }
+.admin-shell .bg-cyan-400\/5, .admin-shell .bg-cyan-400\/10,
+.admin-shell .bg-cyan-400\/15, .admin-shell .bg-violet-400\/5,
+.admin-shell .bg-violet-400\/10 { background-color: #f1f6f3 !important; }
+.admin-shell .border-cyan-300\/10, .admin-shell .border-cyan-300\/15,
+.admin-shell .border-cyan-300\/20, .admin-shell .border-cyan-300\/25,
+.admin-shell .border-violet-300\/20, .admin-shell .border-violet-300\/25 { border-color: #c8d8cf !important; }
+
+.admin-shell button:disabled { opacity: .68 !important; }
+.admin-shell input:disabled, .admin-shell select:disabled,
+.admin-shell textarea:disabled { color: #52616b !important; opacity: .72 !important; }
+.admin-shell ::placeholder { color: #6b7780 !important; opacity: 1; }
+.admin-shell a { color: #2f5d50; }
+.admin-sidebar nav a { color: #38464f; }
+.admin-sidebar nav a[aria-current="page"] { background: #edf4f0; color: #2f5d50; font-weight: 700; }
+.admin-sidebar nav a:hover { background: #e7f0eb; color: #244b40; }
+
+@media (max-width: 900px) {
+  .admin-layout { grid-template-columns: minmax(0, 1fr); }
+  .admin-sidebar { position: static; overflow-x: auto; }
+  .admin-sidebar-brand { display: none; }
+  .admin-sidebar nav { display: flex; min-width: max-content; padding: .35rem; }
+  .admin-sidebar nav a { padding: .55rem .7rem; }
+}
+
+@media (max-width: 640px) {
+  .admin-shell { padding: .5rem !important; }
+  .admin-summary-item:nth-child(3) { border-left: 0; border-top: 1px solid var(--ls-border); }
+  .admin-summary-item:nth-child(4) { border-top: 1px solid var(--ls-border); }
+  .admin-environmental-signals .admin-signal:nth-child(odd) { border-left: 0 !important; }
+  .admin-environmental-signals .admin-signal { border-bottom: 1px solid var(--ls-border) !important; }
+}
+
+.citizen-nav { min-height: 52px; padding-right: 9rem; }
+.citizen-nav-link { border-radius: .375rem; padding: .45rem .7rem; color: #38464f; font-weight: 600; }
+.citizen-nav-link:hover { background: #f1f4f2; color: #174832; }
+.section-kicker { color: #2f5d50; font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.citizen-duplicate-summary { display: none; }
+.citizen-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(270px, .75fr) minmax(0, 1.4fr);
+  grid-template-areas:
+    "location map"
+    "risk map"
+    "controls map"
+    "metrics safety"
+    "route route"
+    "trend alerts"
+    "environment environment";
+  gap: 1rem;
+  align-items: start;
+}
+.citizen-workspace, .citizen-context { display: contents; }
+.citizen-location { grid-area: location; }
+.citizen-risk { grid-area: risk; }
+.citizen-map { grid-area: map; border-radius: .5rem; height: 100%; min-height: 640px; }
+.citizen-safety { grid-area: safety; }
+.citizen-route { grid-area: route; }
+.citizen-controls { grid-area: controls; }
+.citizen-alerts { grid-area: alerts; }
+.citizen-environment { grid-area: environment; }
+.citizen-metrics { grid-area: metrics; }
+.citizen-trend { grid-area: trend; }
+.citizen-risk > *, .citizen-safety, .citizen-route > *, .citizen-controls, .citizen-alerts, .citizen-environment, .citizen-metrics, .citizen-trend { border-radius: .5rem !important; box-shadow: none !important; }
+.location-marker { width: .75rem; height: .75rem; flex: 0 0 auto; border: 3px solid #2f5d50; border-radius: 999px; box-shadow: 0 0 0 4px #e8f0eb; }
+.citizen-metrics > div:not(:first-child) { min-width: 0; padding: .25rem .75rem; border-left: 1px solid var(--ls-border); }
+.citizen-metrics > div:nth-child(2) { border-left: 0; padding-left: 0; }
+.citizen-alerts .space-y-2 { margin-top: .75rem; border-top: 1px solid var(--ls-border); }
+.citizen-alerts .space-y-2 > div { margin-top: 0 !important; border: 0 !important; border-bottom: 1px solid var(--ls-border) !important; border-radius: 0 !important; background: transparent !important; padding: .75rem 0 !important; }
+
+@media (max-width: 1023px) {
+  .citizen-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "location" "risk" "map" "metrics" "safety" "route" "trend" "alerts" "controls" "environment";
+  }
+  .citizen-map { min-height: 480px; }
+}
+
+@media (max-width: 640px) {
+  .citizen-shell { padding: 0 !important; }
+  .citizen-nav { gap: .75rem; padding-left: .75rem; padding-right: 3.5rem; }
+  .citizen-nav-link { padding-inline: .5rem; }
+  .session-chip { right: .5rem !important; }
+  .citizen-map { min-height: 390px; }
+  .citizen-metrics { grid-template-columns: minmax(0, 1fr) !important; }
+  .citizen-metrics > div:first-child { grid-column: 1 / -1; }
+  .citizen-metrics > div:not(:first-child) { border-left: 0; border-top: 1px solid var(--ls-border); padding: .75rem 0; }
+}
+
+.landsense-pulse { animation: landsensePulse 2.6s ease-in-out 2; }
 
 .landsense-safezone {
   filter: drop-shadow(0 0 10px rgba(125, 211, 252, 0.55));

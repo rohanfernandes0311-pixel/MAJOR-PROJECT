@@ -14,6 +14,8 @@ import { confirmOtpAndExchange, isFirebaseSignInPending, resetPhoneSignIn, start
 import { useAuth } from '../auth/AuthProvider'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { rememberPreviousPhoneNumber } from '../services/phoneHistory'
+import { createRecaptcha } from '../authentication/firebase'
+import { discardRecaptchaVerifier, ensureRecaptchaVerifier, isStaleRecaptchaError } from '../authentication/recaptchaLifecycle'
 
 export default function OTP() {
   const navigate = useNavigate()
@@ -32,6 +34,20 @@ export default function OTP() {
   const [accessDecision, setAccessDecision] = useState('')
   const verifyInFlightRef = useRef(false)
   const resendInFlightRef = useRef(false)
+  const recaptchaContainerRef = useRef(null)
+  const recaptchaVerifierRef = useRef(null)
+  const recaptchaInFlightRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      if (!recaptchaInFlightRef.current) {
+        discardRecaptchaVerifier(recaptchaVerifierRef)
+      }
+    }
+  }, [])
 
   const pending = useMemo(() => {
     const statePhone = location.state?.phoneNumber || ''
@@ -111,7 +127,13 @@ export default function OTP() {
     setResending(true)
     setError('')
     try {
-      await startPhoneSignIn(phoneNumber)
+      const verifier = ensureRecaptchaVerifier(
+        recaptchaVerifierRef,
+        recaptchaContainerRef.current,
+        createRecaptcha,
+      )
+      recaptchaInFlightRef.current = true
+      await startPhoneSignIn(phoneNumber, verifier)
       const masked = maskPhoneNumber(phoneNumber)
       savePendingPhone(phoneNumber, masked, returnTo, pending.loginIntent)
       setMaskedPhone(masked)
@@ -119,10 +141,17 @@ export default function OTP() {
       setCooldown(30)
       setOtp('')
     } catch (err) {
+      if (isStaleRecaptchaError(err)) {
+        discardRecaptchaVerifier(recaptchaVerifierRef)
+      }
       setToast({ tone: 'error', message: err?.message || 'Unable to resend OTP.' })
       setError(err?.message || 'Unable to resend OTP.')
     } finally {
-      setResending(false)
+      recaptchaInFlightRef.current = false
+      if (!mountedRef.current) {
+        discardRecaptchaVerifier(recaptchaVerifierRef)
+      }
+      if (mountedRef.current) setResending(false)
       resendInFlightRef.current = false
     }
   }
@@ -139,7 +168,7 @@ export default function OTP() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(125,211,252,0.16),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_30%),linear-gradient(180deg,#030712_0%,#07111d_46%,#081321_100%)] text-white">
+    <div className="auth-shell">
       <div className="mx-auto flex min-h-screen max-w-7xl items-center px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid w-full gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:gap-8">
           <motion.section
@@ -163,7 +192,7 @@ export default function OTP() {
             </div>
 
             <div className="mt-7 rounded-3xl border border-white/10 bg-black/20 p-4 text-sm text-slate-300">
-              You can paste the full code, use backspace to move between digits, and the form will auto-verify once all digits are filled.
+              Enter the code to continue. You can paste all six digits at once.
             </div>
 
             <button
@@ -231,7 +260,7 @@ export default function OTP() {
                 <VerifyButton
                   loading={verifying}
                   disabled={otp.length !== 6}
-                  className="flex-1 bg-gradient-to-r from-cyan-400 to-emerald-400 text-slate-950 shadow-lg shadow-cyan-500/20 hover:brightness-110"
+                  className="ls-primary-action flex-1 shadow-sm"
                 >
                   Verify and continue
                 </VerifyButton>
@@ -251,10 +280,8 @@ export default function OTP() {
                 <div className="flex items-start gap-3">
                   <Sparkles className="mt-0.5 h-4 w-4 text-cyan-200" />
                   <div>
-                    <div className="font-semibold text-white">Security reminder</div>
-                    <p className="mt-1 leading-6">
-                      OTPs expire automatically, resend is rate-limited, and the dashboard will only load after the backend returns a signed JWT.
-                    </p>
+                    <div className="font-semibold text-white">Keep your account secure</div>
+                    <p className="mt-1 leading-6">Never share this one-time code with anyone.</p>
                   </div>
                 </div>
               </div>
@@ -279,6 +306,7 @@ export default function OTP() {
           </motion.div>
         ) : null}
       </AnimatePresence>
+      <div ref={recaptchaContainerRef} className="sr-only" aria-hidden="true" />
     </div>
   )
 }

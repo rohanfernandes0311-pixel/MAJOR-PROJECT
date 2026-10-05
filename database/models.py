@@ -126,6 +126,28 @@ class Alert(Base):
 
 
 # =========================================================
+# ADMIN AUDIT EVENTS
+# =========================================================
+
+class AuditEvent(Base):
+    """Privacy-safe historical record of meaningful Admin operations."""
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp_utc: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    mode: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    zone_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    zone_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    risk: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[str] = mapped_column("metadata", Text, nullable=False, server_default=text("'{}'"))
+
+
+# =========================================================
 # DATASET-BACKED LANDSLIDE INVENTORY
 # =========================================================
 

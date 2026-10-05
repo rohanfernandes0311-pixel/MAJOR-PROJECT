@@ -11,13 +11,15 @@ from __future__ import annotations
 
 import re
 import os
+import hashlib
+import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 import requests
 from backend.auth.router import router as auth_router
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -47,20 +49,33 @@ from local_store import (
     upsert_user,
 )
 from database.connection import SessionLocal, engine, get_db
-from database.models import Alert, LandslideInventory, Location, LocationEvent, User
+from database.models import Alert, AuditEvent, LandslideInventory, Location, LocationEvent, User
 from geofencing import (
     detect_fence_event,
     find_zone_matches,
     highest_zone_risk,
     load_zones,
     primary_zone_id,
+    point_in_polygon,
 )
 from predict import predict
 from route_planner import plan_safe_route
 from sms_service import send_sms_alert, sms_configuration_status
 from services.extension_loader import ExtensionLoader
 from services.safe_route_service import SafeRouteService
-from services.simulation_mode_service import SimulationModeService
+from services.phase6_intelligence import (
+    build_zone_intelligence,
+    find_incident_for_zone,
+    load_incident_catalog,
+    polygon_centroid,
+)
+from services.simulation_mode_service import KODAGU_LOCATIONS, SimulationModeService
+from services.simulation_demonstration import router as simulation_demonstration_router
+from services.audit_service import public_audit_event, try_record_audit_event
+from services.offline_alert_transport import simulate_offline_deliveries
+from services.httpsms_export import (
+    MISSING_SENDER, build_workbook, export_filename, generate_alert_message, select_sms_recipients,
+)
 
 
 BASE_DIR = Path(__file__).parent
@@ -68,6 +83,7 @@ ZONE_PATH = BASE_DIR / "config" / "risk_zones.geojson"
 WEB_UI_DIR = BASE_DIR / "web-ui"
 WEB_UI_DIST_DIR = WEB_UI_DIR / "dist"
 WEB_UI_ASSETS_DIR = WEB_UI_DIST_DIR / "assets"
+INCIDENT_CATALOG_PATH = WEB_UI_DIR / "src" / "data" / "incidentScenarios.json"
 
 ALERT_TEXT = "Landslide warning: You are in a high-risk zone. Move to a safer location immediately."
 RISK_SCORE = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
@@ -96,6 +112,7 @@ weather_service = extensions.weather()
 safe_route_service = SafeRouteService()
 app.include_router(auth_router)
 app.include_router(landslide_extraction_router)
+app.include_router(simulation_demonstration_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -144,10 +161,10 @@ class ProtectedLocationUpdateRequest(BaseModel):
 
 
 class RouteRequest(BaseModel):
-    start_latitude: float
-    start_longitude: float
-    end_latitude: float
-    end_longitude: float
+    start_latitude: float = Field(..., ge=-90, le=90)
+    start_longitude: float = Field(..., ge=-180, le=180)
+    end_latitude: float = Field(..., ge=-90, le=90)
+    end_longitude: float = Field(..., ge=-180, le=180)
 
 
 class PredictRequest(BaseModel):
@@ -174,6 +191,31 @@ class SimulationToggleRequest(BaseModel):
     scenario_name: str = "Normal"
 
 
+class KodaguSimulationRequest(BaseModel):
+    location: str = Field(..., min_length=1, max_length=80)
+    risk_level: str = Field(..., min_length=1, max_length=16)
+
+    class Config:
+        extra = "forbid"
+
+
+class KodaguSimulationTriggerRequest(BaseModel):
+    recipient_ids: list[str] = Field(default_factory=list, max_length=500)
+
+    class Config:
+        extra = "forbid"
+
+
+class SimulationDemoExportRequest(BaseModel):
+    scenario_revision: str = Field(..., min_length=1, max_length=100)
+    recipient_ids: list[str] = Field(default_factory=list, max_length=500)
+    message: str = Field(..., min_length=1, max_length=1000)
+    revision: str | None = None
+
+    class Config:
+        extra = "forbid"
+
+
 class AffectedZonePreviewRequest(BaseModel):
     """Admin-only, non-persistent recipient preview for a configured zone."""
 
@@ -185,6 +227,33 @@ class AffectedZonePreviewRequest(BaseModel):
 
     class Config:
         extra = "forbid"
+
+
+class AdminAuditUiEventRequest(BaseModel):
+    """Narrow, noncritical Admin UI audit input; details are derived server-side."""
+
+    event_type: str = Field(..., min_length=1, max_length=64)
+    zone_id: str | None = Field(default=None, max_length=100)
+    incident_id: str | None = Field(default=None, max_length=120)
+    simulated_count: int | None = Field(default=None, ge=0, le=1000)
+
+    class Config:
+        extra = "forbid"
+
+
+class OfflineDemoAreaRequest(BaseModel):
+    """Configured-zone or catalog-incident selection for the isolated demo."""
+
+    zone_id: str | None = Field(default=None, min_length=1, max_length=100)
+    incident_id: str | None = Field(default=None, min_length=1, max_length=120)
+
+    class Config:
+        extra = "forbid"
+
+
+class OfflineDemoSendRequest(OfflineDemoAreaRequest):
+    channels: list[str] = Field(..., min_length=1, max_length=2)
+    confirmed: bool
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -324,7 +393,9 @@ def _evaluate_location(
     final_risk = combine_risk(ml_pred["risk_label"], zone_risk)
 
     simulation_state = simulation_mode.read_state()
-    simulation_enabled = bool(simulation_state["enabled"])
+    # The admin-only Kodagu workflow never decorates citizen predictions or ML
+    # inputs. Legacy presentation simulation remains backward compatible.
+    simulation_enabled = bool(simulation_state["enabled"] and not simulation_state.get("is_simulation"))
     simulated_risk = "LOW"
     if simulation_enabled:
         simulated_risk = simulation_mode.effective_forced_risk()
@@ -774,6 +845,31 @@ def _configured_zone(zone_id: str, zones_geojson: dict[str, Any]) -> dict[str, A
     return None
 
 
+def _historical_count_in_zone(db: Session, feature: dict[str, Any]) -> int:
+    """Count historical inventory points in a configured polygon, not demo incidents."""
+    ring = feature["geometry"]["coordinates"][0]
+    longitudes = [float(point[0]) for point in ring]
+    latitudes = [float(point[1]) for point in ring]
+    rows = db.execute(
+        select(LandslideInventory.latitude, LandslideInventory.longitude).where(
+            LandslideInventory.latitude.between(min(latitudes), max(latitudes)),
+            LandslideInventory.longitude.between(min(longitudes), max(longitudes)),
+        )
+    ).all()
+    return sum(1 for latitude, longitude in rows if point_in_polygon(latitude, longitude, ring))
+
+
+def _latest_zone_ml_prediction(db: Session, zone_id: str) -> tuple[str | None, float | None]:
+    """Reuse the most recent persisted ML output for this zone when one exists."""
+    event = db.scalar(
+        select(LocationEvent)
+        .where(LocationEvent.active_zone_id == zone_id)
+        .order_by(LocationEvent.id.desc())
+        .limit(1)
+    )
+    return (str(event.ml_risk).upper(), None) if event and event.ml_risk else (None, None)
+
+
 def _admin_risk_summary(db: Session) -> dict[str, int]:
     """Return only aggregate risk counts; absent classifications remain zero."""
     summary = {"LOW": 0, "MEDIUM": 0, "HIGH": 0, "CRITICAL": 0}
@@ -821,6 +917,211 @@ def admin_stats(
             "authentication": "jwt-enabled",
         },
     }
+
+
+@app.get("/admin/intelligence/zones/{zone_id}")
+def admin_zone_intelligence(
+    zone_id: str,
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Return evidence for one configured zone without triggering Phase 5 alerts."""
+    feature = _configured_zone(zone_id.strip(), load_zones(ZONE_PATH))
+    if not feature:
+        raise HTTPException(status_code=404, detail="Configured intelligence zone not found")
+
+    latitude, longitude = polygon_centroid(feature)
+    try:
+        weather = weather_service.fetch_weather_context(latitude, longitude)
+    except Exception:
+        weather = None
+
+    try:
+        historical_count = _historical_count_in_zone(db, feature)
+        historical_available = True
+    except (SQLAlchemyError, AttributeError, TypeError, ValueError):
+        historical_count = None
+        historical_available = False
+
+    try:
+        ml_risk, ml_confidence = _latest_zone_ml_prediction(db, zone_id.strip())
+    except (SQLAlchemyError, AttributeError, TypeError, ValueError):
+        ml_risk, ml_confidence = None, None
+
+    try:
+        incident = find_incident_for_zone(feature, load_incident_catalog(INCIDENT_CATALOG_PATH))
+        incident_catalog_available = True
+    except (OSError, ValueError, TypeError):
+        incident = None
+        incident_catalog_available = False
+
+    intelligence = build_zone_intelligence(
+        feature,
+        weather=weather,
+        historical_count=historical_count,
+        historical_available=historical_available,
+        ml_risk=ml_risk,
+        ml_confidence=ml_confidence,
+        overall_risk=combine_risk(ml_risk or "LOW", str(feature.get("properties", {}).get("risk_level") or "LOW")),
+        incident=incident,
+        incident_catalog_available=incident_catalog_available,
+    )
+    try:
+        _population_feature, total_registered_users, members = _configured_zone_population(zone_id.strip(), db)
+        inside_members = [member for member in members if member["inside"]]
+        affected = {
+            "status": "AVAILABLE",
+            "totalRegisteredUsers": total_registered_users,
+            "totalUsers": len(members),
+            "insideUsers": len(inside_members),
+            "outsideUsers": len(members) - len(inside_members),
+            "realUsers": len(members),
+            "recipientCount": len(inside_members),
+            "smsEligibleCount": sum(bool(member["sms_eligible"]) for member in inside_members),
+            "simulatedUsers": 0,
+            "users": [_public_population_member(member) for member in members],
+            "selectionAuthority": "EXISTING PHASE 5 SERVER GEOFENCE",
+            "automaticAlert": False,
+        }
+    except (SQLAlchemyError, AttributeError, TypeError, ValueError):
+        affected = {
+            "status": "UNAVAILABLE", "totalRegisteredUsers": None, "totalUsers": None,
+            "insideUsers": None, "outsideUsers": None, "realUsers": None,
+            "recipientCount": None, "smsEligibleCount": None, "simulatedUsers": 0,
+            "users": [], "selectionAuthority": "EXISTING PHASE 5 SERVER GEOFENCE",
+            "automaticAlert": False,
+        }
+    intelligence["affected"] = affected
+    assessment = intelligence.get("assessment") or {}
+    audit_event_type = "INTELLIGENCE_UNAVAILABLE" if assessment.get("dataQuality") == "UNAVAILABLE" else "INTELLIGENCE_CALCULATED"
+    try_record_audit_event(
+        db,
+        event_type=audit_event_type,
+        mode="REAL",
+        zone_id=str(feature.get("properties", {}).get("zone_id") or zone_id),
+        zone_name=str(feature.get("properties", {}).get("name") or zone_id),
+        risk=assessment.get("overallRisk"),
+        message="Zone intelligence was unavailable." if audit_event_type == "INTELLIGENCE_UNAVAILABLE" else "Zone intelligence assessment calculated.",
+        metadata={
+            "confidence": assessment.get("confidence"),
+            "dataQuality": assessment.get("dataQuality"),
+            "recommendedAction": assessment.get("recommendedAction"),
+            "automaticAlert": False,
+        },
+    )
+    try_record_audit_event(
+        db,
+        event_type="AFFECTED_POPULATION_CALCULATED",
+        mode="REAL",
+        zone_id=str(feature.get("properties", {}).get("zone_id") or zone_id),
+        zone_name=str(feature.get("properties", {}).get("name") or zone_id),
+        risk=assessment.get("overallRisk"),
+        message="Authoritative affected population calculated." if affected.get("status") == "AVAILABLE" else "Affected population was unavailable.",
+        metadata={
+            "affectedStatus": affected.get("status"),
+            "realUsersInside": affected.get("insideUsers"),
+            "realUsersOutside": affected.get("outsideUsers"),
+            "eligibleRecipients": affected.get("recipientCount"),
+            "smsEligibleRecipients": affected.get("smsEligibleCount"),
+            "totalRegisteredUsers": affected.get("totalRegisteredUsers"),
+        },
+    )
+    return intelligence
+
+
+@app.get("/admin/audit/events")
+def admin_audit_events(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    category: str | None = Query(default=None, max_length=32),
+    mode: str | None = Query(default=None, max_length=16),
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Return bounded, newest-first, privacy-safe Admin audit history."""
+    normalized_category = str(category).strip().upper() if category else None
+    normalized_mode = str(mode).strip().upper() if mode else None
+    allowed_categories = {"SYSTEM", "INTELLIGENCE", "ADMIN_ACTION", "ALERT", "SIMULATION", "INCIDENT"}
+    if normalized_category and normalized_category not in allowed_categories:
+        raise HTTPException(status_code=422, detail="Unsupported audit category")
+    if normalized_mode and normalized_mode not in {"REAL", "SIMULATION", "DEMO"}:
+        raise HTTPException(status_code=422, detail="Unsupported audit mode")
+
+    filters = []
+    if normalized_category:
+        filters.append(AuditEvent.category == normalized_category)
+    if normalized_mode:
+        filters.append(AuditEvent.mode == normalized_mode)
+    count_statement = select(func.count()).select_from(AuditEvent)
+    event_statement = select(AuditEvent)
+    if filters:
+        count_statement = count_statement.where(*filters)
+        event_statement = event_statement.where(*filters)
+    total = int(db.scalar(count_statement) or 0)
+    events = db.scalars(event_statement.order_by(AuditEvent.id.desc()).offset(offset).limit(limit)).all()
+    return {
+        "events": [public_audit_event(event) for event in events],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "hasMore": offset + len(events) < total,
+    }
+
+
+@app.post("/admin/audit/events")
+def record_admin_ui_audit_event(
+    req: AdminAuditUiEventRequest,
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Record controlled UI events; critical alert events are never accepted here."""
+    event_type = req.event_type.strip().upper()
+    if event_type not in {"ZONE_SELECTED", "INCIDENT_SELECTED", "DEMO_INCIDENT_LAUNCHED", "DEMO_ALERT_GENERATED"}:
+        raise HTTPException(status_code=422, detail="This event must be recorded by its authoritative backend operation")
+
+    zone = _configured_zone((req.zone_id or "").strip(), load_zones(ZONE_PATH)) if req.zone_id else None
+    if event_type == "ZONE_SELECTED":
+        if zone is None:
+            raise HTTPException(status_code=404, detail="Configured audit zone not found")
+        properties = zone.get("properties", {})
+        event = try_record_audit_event(
+            db,
+            event_type=event_type,
+            mode="REAL",
+            zone_id=str(properties.get("zone_id") or ""),
+            zone_name=str(properties.get("name") or properties.get("zone_id") or "Configured zone"),
+            risk=properties.get("risk_level"),
+            message="Configured zone selected for Admin review.",
+            metadata={"automaticAlert": False},
+            dedupe_seconds=30,
+        )
+    else:
+        incidents = load_incident_catalog(INCIDENT_CATALOG_PATH)
+        incident = next((item for item in incidents if str(item.get("id")) == str(req.incident_id or "")), None)
+        if incident is None:
+            raise HTTPException(status_code=404, detail="Audit incident scenario not found")
+        if event_type.startswith("DEMO_") and not bool(simulation_mode.read_state().get("enabled")):
+            raise HTTPException(status_code=409, detail="Simulation Mode must be active for demo audit events")
+        mode = "DEMO" if event_type == "INCIDENT_SELECTED" else "SIMULATION"
+        event = try_record_audit_event(
+            db,
+            event_type=event_type,
+            mode=mode,
+            risk=incident.get("demo_risk"),
+            message="Demo incident scenario selected." if event_type == "INCIDENT_SELECTED" else "Demo incident launched." if event_type == "DEMO_INCIDENT_LAUNCHED" else "Demo alert generated; no real alert was sent.",
+            metadata={
+                "incidentTitle": incident.get("title"),
+                "incidentStatus": incident.get("verification_status"),
+                "sourceLabel": incident.get("source_label"),
+                "locationPrecision": incident.get("location_precision"),
+                "simulatedParticipants": req.simulated_count if event_type != "INCIDENT_SELECTED" else None,
+                "externalNotificationsSuppressed": True,
+            },
+            dedupe_seconds=10 if event_type == "INCIDENT_SELECTED" else 0,
+        )
+    if event is None:
+        raise HTTPException(status_code=503, detail="Audit persistence is unavailable")
+    return {"event": public_audit_event(event)}
 
 
 @app.get("/admin/users")
@@ -931,7 +1232,7 @@ def preview_affected_zone_recipients(
     start_time = datetime.now(timezone.utc)
     public_recipients = [_public_affected_zone_recipient(recipient) for recipient in recipients]
     sms_config = sms_configuration_status()
-    return {
+    result = {
         "preview_only": True,
         "source_type": "ADMIN_SIMULATION",
         "affected_zone": {
@@ -952,6 +1253,23 @@ def preview_affected_zone_recipients(
         "sms_configuration": sms_config,
         "simulation_mode": bool(simulation_mode.read_state().get("enabled")),
     }
+    try_record_audit_event(
+        db,
+        event_type="RECIPIENT_PREVIEW_OPENED",
+        mode="REAL",
+        zone_id=str(feature["properties"].get("zone_id") or req.zone_id),
+        zone_name=str(feature["properties"].get("name") or req.zone_id),
+        risk=risk_level,
+        message="Authoritative Phase 5 recipient preview opened; no alert was activated.",
+        metadata={
+            "recipientCount": len(recipients),
+            "smsEligibleRecipients": result["sms_eligible_count"],
+            "totalRegisteredUsers": total_registered_users,
+            "status": "PREVIEW_ONLY",
+            "automaticAlert": False,
+        },
+    )
+    return result
 
 
 def _sms_max_recipients() -> int:
@@ -966,6 +1284,385 @@ def _public_affected_zone_recipient(recipient: dict[str, Any]) -> dict[str, Any]
     return {key: value for key, value in recipient.items() if not key.startswith("_")}
 
 
+def _safe_citizen_id(user_id: str) -> str:
+    digest = hashlib.sha256(str(user_id).encode("utf-8")).hexdigest()[:8].upper()
+    return f"Citizen #{digest}"
+
+
+def _public_population_member(member: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "displayId": _safe_citizen_id(str(member["_user_id"])),
+        "status": "INSIDE" if member["inside"] else "OUTSIDE",
+        "inside": bool(member["inside"]),
+        "recipientEligible": bool(member["inside"]),
+        "smsEligible": bool(member["sms_eligible"]) if member["inside"] else False,
+        "latitude": member["latitude"],
+        "longitude": member["longitude"],
+        "lastUpdated": member["last_updated"],
+        "currentRisk": member["current_risk"],
+    }
+
+
+def _configured_zone_population(
+    zone_id: str, db: Session
+) -> tuple[dict[str, Any], int, list[dict[str, Any]]]:
+    """Return server-calculated located users for one configured Phase 5 zone."""
+    feature = _configured_zone(zone_id, load_zones(ZONE_PATH))
+    if feature is None:
+        raise HTTPException(status_code=404, detail="Configured affected zone not found")
+    selected_geojson = {"type": "FeatureCollection", "features": [feature]}
+    total_registered_users = int(db.scalar(select(func.count()).select_from(User)) or 0)
+    rows = db.execute(select(User, Location).join(Location, Location.user_id == User.uid)).all()
+    members: list[dict[str, Any]] = []
+    for user, location in rows:
+        inside = bool(find_zone_matches(location.latitude, location.longitude, selected_geojson))
+        current_risk = None
+        if inside:
+            current_risk = db.scalar(
+                select(LocationEvent.final_risk)
+                .where(LocationEvent.user_id == user.uid)
+                .order_by(LocationEvent.timestamp_utc.desc())
+                .limit(1)
+            )
+        members.append({
+            "_user_id": str(user.uid),
+            "_phone_number": str(user.phone_number or ""),
+            "_alert_enabled": bool(getattr(user, "alert_enabled", 0)),
+            "inside": inside,
+            "sms_eligible": bool(getattr(user, "alert_enabled", 0)) and bool(E164_PATTERN.match(str(user.phone_number or ""))),
+            "latitude": location.latitude,
+            "longitude": location.longitude,
+            "last_updated": location.last_updated,
+            "current_risk": current_risk,
+        })
+    return feature, total_registered_users, members
+
+
+def _feature_population(feature: dict[str, Any], db: Session) -> tuple[int, list[dict[str, Any]]]:
+    """Run the existing point-in-polygon geofence against a supplied server feature."""
+    selected_geojson = {"type": "FeatureCollection", "features": [feature]}
+    total_registered_users = int(db.scalar(select(func.count()).select_from(User)) or 0)
+    rows = db.execute(select(User, Location).join(Location, Location.user_id == User.uid)).all()
+    members: list[dict[str, Any]] = []
+    for user, location in rows:
+        inside = bool(find_zone_matches(location.latitude, location.longitude, selected_geojson))
+        members.append({
+            "_user_id": str(user.uid),
+            "_phone_number": str(user.phone_number or ""),
+            "_alert_enabled": bool(getattr(user, "alert_enabled", 0)),
+            "inside": inside,
+            "sms_eligible": inside and bool(getattr(user, "alert_enabled", 0)) and bool(E164_PATTERN.match(str(user.phone_number or ""))),
+            "latitude": location.latitude,
+            "longitude": location.longitude,
+            "last_updated": location.last_updated,
+            "current_risk": None,
+        })
+    return total_registered_users, members
+
+
+def _httpsms_export_preview(zone_id: str, db: Session, recipient_ids: set[str] | None = None) -> dict[str, Any]:
+    simulation_state = simulation_mode.read_state()
+    if not simulation_state.get("enabled"):
+        raise HTTPException(status_code=409, detail="Enable Simulation Mode before preparing an httpSMS export.")
+    try:
+        simulation_feature = simulation_state.get("synthetic_zone")
+        if simulation_state.get("is_simulation") and simulation_feature and str((simulation_feature.get("properties") or {}).get("zone_id")) == zone_id:
+            feature = simulation_feature
+            _total, members = _feature_population(feature, db)
+        else:
+            feature, _total, members = _configured_zone_population(zone_id, db)
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="Unable to retrieve registered users. Please retry.") from exc
+    except (ValueError, OSError, TypeError, KeyError, IndexError) as exc:
+        raise HTTPException(status_code=422, detail="Danger-zone geometry is unavailable or invalid.") from exc
+    props = feature.get("properties", {})
+    risk = str(props.get("risk_level") or "").upper()
+    location = str(props.get("name") or zone_id)
+    geometry = feature.get("geometry") or {}
+    rings = geometry.get("coordinates") or []
+    try:
+        valid_geometry = geometry.get("type") == "Polygon" and bool(rings) and all(
+            len(ring) >= 4 and ring[0] == ring[-1] and all(
+                len(point) >= 2 and math.isfinite(float(point[0])) and math.isfinite(float(point[1]))
+                and -180 <= float(point[0]) <= 180 and -90 <= float(point[1]) <= 90
+                for point in ring
+            ) for ring in rings
+        )
+    except (TypeError, ValueError, IndexError):
+        valid_geometry = False
+    if not valid_geometry:
+        raise HTTPException(status_code=422, detail="Danger-zone geometry is unavailable or invalid. A configured Polygon is required.")
+    # The existing matcher tests the outer ring. Exclude any polygon holes for export.
+    for member in members:
+        if member["inside"] and any(point_in_polygon(member["latitude"], member["longitude"], hole) for hole in rings[1:]):
+            member["inside"] = False
+    # Eligibility never implies selection. Omitted selections export nobody.
+    from services.httpsms_export import normalize_phone
+    affected_count = sum(bool(member["inside"]) for member in members)
+    public_recipients = [{"display_id": _safe_citizen_id(m["_user_id"]),
+                          "phone_masked": _mask_phone(m["_phone_number"]),
+                          "sms_eligible": bool(m["_alert_enabled"] and normalize_phone(m["_phone_number"]))}
+                         for m in members if m["inside"]]
+    selected_ids = recipient_ids or set()
+    eligible_ids = {item["display_id"] for item in public_recipients if item["sms_eligible"]}
+    if not selected_ids.issubset(eligible_ids):
+        raise HTTPException(status_code=422, detail="Select only eligible users inside this danger zone.")
+    selected_members = [m for m in members if m["inside"] and _safe_citizen_id(m["_user_id"]) in selected_ids]
+    if simulation_state.get("is_simulation") and simulation_feature is feature:
+        message = str((simulation_state.get("alert_preview") or {}).get("message") or "")
+    else:
+        try:
+            message = generate_alert_message(risk, location)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    result = select_sms_recipients(selected_members)
+    result.update(affected_count=affected_count, eligible_count=len(eligible_ids), selected_count=len(selected_ids))
+    sender = os.getenv("HTTPSMS_FROM_NUMBER", "").strip()
+    sender_error = None
+    if not sender:
+        sender_error = MISSING_SENDER
+    elif not re.fullmatch(r"\+?[1-9][0-9]{7,14}", sender):
+        sender_error = "HTTPSMS_FROM_NUMBER is invalid. Configure an international sender number."
+    error = sender_error
+    if not error and not result["sms_eligible_count"]:
+        error = "No SMS-eligible users selected. Explicitly select recipients inside this danger zone."
+    revision = hashlib.sha256(repr((result, sender, risk, location, geometry, sorted(selected_ids))).encode()).hexdigest()
+    return {**result, "zone_id": zone_id, "location": location, "risk_level": risk,
+            "revision": revision,
+            "synthetic": True, "message": message, "sender_configured": not bool(sender_error),
+            "download_enabled": not bool(error), "error": error, "_sender": sender,
+            "recipients": public_recipients,
+            "invalid_recipients": [_safe_citizen_id(uid) for uid in result["_invalid_user_ids"]],
+            "filename": export_filename(risk, location)}
+
+
+@app.get("/admin/affected-zones/{zone_id}/httpsms-preview")
+def preview_httpsms_excel(zone_id: str, _: dict = Depends(require_admin), db: Session = Depends(get_db), recipient_ids: str | None = None):
+    selected = set(filter(None, (recipient_ids or "").split(","))) if recipient_ids is not None else None
+    result = _httpsms_export_preview(zone_id, db, selected)
+    return {key: value for key, value in result.items() if not key.startswith("_")}
+
+
+@app.get("/admin/affected-zones/{zone_id}/httpsms-excel")
+def download_httpsms_excel(zone_id: str, _: dict = Depends(require_admin), db: Session = Depends(get_db), revision: str | None = None, recipient_ids: str | None = None):
+    selected = set(filter(None, (recipient_ids or "").split(","))) if recipient_ids is not None else None
+    result = _httpsms_export_preview(zone_id, db, selected)
+    if not result["download_enabled"]:
+        raise HTTPException(status_code=422, detail=result["error"])
+    if revision is not None and revision != result["revision"]:
+        raise HTTPException(status_code=409, detail="Recipients or zone information changed. Refresh recipients before downloading.")
+    try:
+        content = build_workbook(result["_sender"], result["_phones"], result["message"])
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Unable to generate httpSMS Excel. Please retry.") from exc
+    return Response(content=content,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{result["filename"]}"',
+                             "Cache-Control": "no-store", "X-Recipient-Count": str(result["sms_eligible_count"])})
+
+
+def _offline_demo_area(zone_id: str, db: Session) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Resolve one configured red zone and return privacy-safe inside users."""
+    feature, _total_registered_users, members = _configured_zone_population(zone_id.strip(), db)
+    properties = feature.get("properties", {})
+    risk = str(properties.get("risk_level") or "").upper()
+    if risk not in {"HIGH", "CRITICAL"}:
+        raise HTTPException(status_code=422, detail="Offline alert demonstrations require a configured HIGH or CRITICAL zone")
+
+    recipients = []
+    for member in members:
+        if not member["inside"]:
+            continue
+        recipients.append({
+            "displayId": _safe_citizen_id(str(member["_user_id"])),
+            "status": "INSIDE ZONE",
+            "userType": "REAL_REGISTERED_USER",
+            "smsRegistered": bool(E164_PATTERN.match(str(member["_phone_number"] or ""))),
+            "bluetoothDemoEligible": True,
+        })
+    return feature, recipients
+
+
+def _incident_affected_feature(incident_id: str) -> dict[str, Any]:
+    """Build polygonal GeoJSON from an existing catalog incident circle."""
+    incident = next(
+        (item for item in load_incident_catalog(INCIDENT_CATALOG_PATH) if str(item.get("id")) == incident_id),
+        None,
+    )
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Configured incident demonstration not found")
+    risk = str(incident.get("demo_risk") or "").upper()
+    if risk not in {"HIGH", "CRITICAL"}:
+        raise HTTPException(status_code=422, detail="Offline alert demonstrations require a HIGH or CRITICAL incident")
+    latitude = float(incident["latitude"])
+    longitude = float(incident["longitude"])
+    radius_meters = float(incident.get("affected_radius_meters") or 0)
+    if radius_meters <= 0:
+        raise HTTPException(status_code=422, detail="Incident affected-radius geometry is unavailable")
+    ring = []
+    for index in range(49):
+        angle = 2 * math.pi * index / 48
+        north = math.cos(angle) * radius_meters
+        east = math.sin(angle) * radius_meters
+        ring.append([
+            longitude + east / (111320 * math.cos(math.radians(latitude))),
+            latitude + north / 111320,
+        ])
+    return {
+        "type": "Feature",
+        "properties": {
+            "zone_id": f"incident:{incident_id}", "incident_id": incident_id,
+            "name": str(incident.get("title") or "Incident affected area"),
+            "risk_level": risk, "area_type": "INCIDENT_RADIUS",
+        },
+        "geometry": {"type": "Polygon", "coordinates": [ring]},
+    }
+
+
+def _offline_demo_incident_area(incident_id: str, db: Session) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Evaluate a catalog incident radius through the existing geofence helper."""
+    feature = _incident_affected_feature(incident_id.strip())
+    selected_geojson = {"type": "FeatureCollection", "features": [feature]}
+    rows = db.execute(select(User, Location).join(Location, Location.user_id == User.uid)).all()
+    members = []
+    for user, location in rows:
+        if not find_zone_matches(location.latitude, location.longitude, selected_geojson):
+            continue
+        members.append({
+            "displayId": _safe_citizen_id(str(user.uid)),
+            "status": "INSIDE AFFECTED RADIUS",
+            "userType": "REAL_REGISTERED_USER",
+            "smsRegistered": bool(E164_PATTERN.match(str(user.phone_number or ""))),
+            "bluetoothDemoEligible": True,
+        })
+    return feature, members
+
+
+def _resolve_offline_demo_area(req: OfflineDemoAreaRequest, db: Session) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    if bool(req.zone_id) == bool(req.incident_id):
+        raise HTTPException(status_code=422, detail="Select exactly one configured zone or incident affected area")
+    if req.zone_id:
+        return _offline_demo_area(req.zone_id, db)
+    return _offline_demo_incident_area(str(req.incident_id), db)
+
+
+def _offline_demo_preview_payload(feature: dict[str, Any], recipients: list[dict[str, Any]]) -> dict[str, Any]:
+    properties = feature.get("properties", {})
+    return {
+        "simulation": True,
+        "offline_delivery_simulation": True,
+        "no_real_alert_sent": True,
+        "area": {
+            "areaType": str(properties.get("area_type") or "CONFIGURED_ZONE"),
+            "zoneId": None if properties.get("incident_id") else str(properties.get("zone_id") or ""),
+            "incidentId": str(properties.get("incident_id")) if properties.get("incident_id") else None,
+            "name": str(properties.get("name") or "Configured zone"),
+            "risk": str(properties.get("risk_level") or "HIGH").upper(),
+            "geometryType": str(feature.get("geometry", {}).get("type") or "Polygon"),
+        },
+        "affectedRegisteredUsers": len(recipients),
+        "simulatedParticipants": 0,
+        "recipients": recipients,
+        "selectionAuthority": "EXISTING PHASE 5 SERVER GEOFENCE",
+    }
+
+
+@app.post("/admin/offline-demo-alerts/preview")
+def preview_offline_demo_alert(
+    req: OfflineDemoAreaRequest,
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Calculate demo recipients only while the explicit safety mode is active."""
+    if not bool(simulation_mode.read_state().get("enabled")):
+        raise HTTPException(status_code=409, detail="Simulation Mode must be active for offline alert demonstrations")
+    feature, recipients = _resolve_offline_demo_area(req, db)
+    return _offline_demo_preview_payload(feature, recipients)
+
+
+@app.post("/admin/offline-demo-alerts/send")
+def send_offline_demo_alert(
+    req: OfflineDemoSendRequest,
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Generate local demo records without Alert writes or external transports."""
+    if not bool(simulation_mode.read_state().get("enabled")):
+        raise HTTPException(status_code=409, detail="Simulation Mode must be active for offline alert demonstrations")
+    if req.confirmed is not True:
+        raise HTTPException(status_code=422, detail="Explicit confirmation is required")
+    channels = list(dict.fromkeys(str(channel).strip().upper() for channel in req.channels))
+    if not channels or any(channel not in {"SMS_DEMO", "BLUETOOTH_DEMO"} for channel in channels):
+        raise HTTPException(status_code=422, detail="Only SMS_DEMO and BLUETOOTH_DEMO channels are supported")
+
+    # Recalculate at send time.  The client cannot submit recipient IDs.
+    feature, recipients = _resolve_offline_demo_area(req, db)
+    properties = feature.get("properties", {})
+    risk = str(properties.get("risk_level") or "HIGH").upper()
+    area_name = str(properties.get("name") or "Configured zone")
+    message = (
+        f"LANDSLIDE EMERGENCY\n\nYou are currently inside a {risk} risk area.\n\n"
+        "Move away from the affected zone and follow safer-route guidance.\n\n"
+        "OFFLINE DEMO\nNo real message was sent."
+    )
+    deliveries = simulate_offline_deliveries(recipients, channels, message)
+    sms_count = sum(item["channel"] == "SMS_DEMO" for item in deliveries)
+    bluetooth_count = sum(item["channel"] == "BLUETOOTH_DEMO" for item in deliveries)
+    audit_event = try_record_audit_event(
+        db,
+        event_type="OFFLINE_DEMO_ALERT_COMPLETED",
+        mode="SIMULATION",
+        zone_id=str(properties.get("zone_id") or req.zone_id or req.incident_id),
+        zone_name=area_name,
+        risk=risk,
+        message="Offline delivery demonstration completed; no real alert was sent.",
+        metadata={
+            "channels": channels,
+            "recipientCount": len(recipients),
+            "smsDemoCount": sms_count,
+            "bluetoothDemoCount": bluetooth_count,
+            "realSmsCount": 0,
+            "realBluetoothCount": 0,
+            "realAlertCount": 0,
+            "offlineDeliverySimulation": True,
+            "externalNotificationsSuppressed": True,
+        },
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    return {
+        **_offline_demo_preview_payload(feature, recipients),
+        "status": "DEMO_DELIVERED",
+        "channels": channels,
+        "deliveries": deliveries,
+        "summary": {
+            "smsDemo": sms_count,
+            "bluetoothDemo": bluetooth_count,
+            "realSms": 0,
+            "realBluetooth": 0,
+            "realAlerts": 0,
+        },
+        "generatedAt": now,
+        "message": message,
+        "demoAlert": {
+            "id": f"offline-demo-{properties.get('zone_id')}-{now}",
+            "simulation": True,
+            "offline_demo": True,
+            "title": "LANDSLIDE EMERGENCY",
+            "location_name": area_name,
+            "district": "Configured risk area",
+            "date": now[:10],
+            "demo_risk": risk,
+            "short_description": f"You are inside a {risk} risk zone. Move away from the affected area.",
+            "safety_guidance": "Follow safer-route guidance and official emergency instructions.",
+            "notification_message": message,
+            "launched_at": now,
+            "delivery_channels": channels,
+            "no_real_alert_sent": True,
+        },
+        "auditEvent": public_audit_event(audit_event) if audit_event is not None else None,
+    }
+
+
 def _affected_zone_recipients(
     req: AffectedZonePreviewRequest, db: Session
 ) -> tuple[str, str, dict[str, Any], int, list[dict[str, Any]]]:
@@ -978,36 +1675,21 @@ def _affected_zone_recipients(
     if not message:
         raise HTTPException(status_code=422, detail="message must not be blank")
 
-    zones_geo = load_zones(ZONE_PATH)
-    feature = _configured_zone(req.zone_id.strip(), zones_geo)
-    if feature is None:
-        raise HTTPException(status_code=404, detail="Configured affected zone not found")
-
-    # Reuse the existing geofence implementation instead of duplicating
-    # point-in-polygon logic. The client never supplies geometry.
-    selected_geojson = {"type": "FeatureCollection", "features": [feature]}
-    total_registered_users = int(db.scalar(select(func.count()).select_from(User)) or 0)
-    rows = db.execute(select(User, Location).join(Location, Location.user_id == User.uid)).all()
+    feature, total_registered_users, members = _configured_zone_population(req.zone_id.strip(), db)
     recipients: list[dict[str, Any]] = []
-    for user, location in rows:
-        if not find_zone_matches(location.latitude, location.longitude, selected_geojson):
+    for member in members:
+        if not member["inside"]:
             continue
-        current_risk = db.scalar(
-            select(LocationEvent.final_risk)
-            .where(LocationEvent.user_id == user.uid)
-            .order_by(LocationEvent.timestamp_utc.desc())
-            .limit(1)
-        )
         recipients.append(
             {
-                "user_id": user.uid,
-                "phone_masked": _mask_phone(user.phone_number),
-                "sms_eligible": bool(getattr(user, "alert_enabled", 0)) and bool(E164_PATTERN.match(str(user.phone_number or ""))),
-                "_sms_phone_number": str(user.phone_number or ""),
-                "latitude": location.latitude,
-                "longitude": location.longitude,
-                "last_updated": location.last_updated,
-                "current_risk": current_risk,
+                "user_id": member["_user_id"],
+                "phone_masked": _mask_phone(member["_phone_number"]),
+                "sms_eligible": member["sms_eligible"],
+                "_sms_phone_number": member["_phone_number"],
+                "latitude": member["latitude"],
+                "longitude": member["longitude"],
+                "last_updated": member["last_updated"],
+                "current_risk": member["current_risk"],
             }
         )
     return risk_level, message, feature, total_registered_users, recipients
@@ -1020,7 +1702,27 @@ def activate_affected_zone_alert(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Persist in-app alerts, then optionally SMS newly targeted eligible users."""
-    risk_level, message, feature, _total_registered_users, recipients = _affected_zone_recipients(req, db)
+    if bool(simulation_mode.read_state().get("enabled")):
+        raise HTTPException(
+            status_code=409,
+            detail="Real configured-zone activation is disabled while Admin Simulation Mode is active",
+        )
+    try:
+        risk_level, message, feature, _total_registered_users, recipients = _affected_zone_recipients(req, db)
+    except HTTPException as exc:
+        configured = _configured_zone(req.zone_id.strip(), load_zones(ZONE_PATH))
+        properties = (configured or {}).get("properties", {})
+        try_record_audit_event(
+            db,
+            event_type="ALERT_ACTIVATION_FAILED",
+            mode="REAL",
+            zone_id=str(properties.get("zone_id") or req.zone_id),
+            zone_name=properties.get("name"),
+            risk=req.risk_level,
+            message="Configured-zone alert activation was rejected.",
+            metadata={"reason": "Configured zone was not found" if exc.status_code == 404 else "Activation request was rejected by server validation", "status": "REJECTED"},
+        )
+        raise
     activated_at = datetime.now(timezone.utc)
     cutoff = (activated_at - timedelta(minutes=req.duration_minutes)).isoformat()
     recipient_ids = [str(recipient["user_id"]) for recipient in recipients]
@@ -1059,6 +1761,16 @@ def activate_affected_zone_alert(
             db.commit()
     except SQLAlchemyError:
         db.rollback()
+        try_record_audit_event(
+            db,
+            event_type="ALERT_ACTIVATION_FAILED",
+            mode="REAL",
+            zone_id=str(feature["properties"].get("zone_id") or req.zone_id),
+            zone_name=str(feature["properties"].get("name") or req.zone_id),
+            risk=risk_level,
+            message="Configured-zone alert activation failed before completion.",
+            metadata={"reason": "Database activation transaction failed", "status": "FAILED"},
+        )
         raise
 
     created_count = len(alerts_to_create)
@@ -1068,7 +1780,7 @@ def activate_affected_zone_alert(
         recipient for recipient in recipients
         if recipient["sms_eligible"] and str(recipient["user_id"]) in created_user_ids
     ]
-    simulation_enabled = bool(simulation_mode.read_state().get("enabled"))
+    simulation_enabled = False
     sms_config = sms_configuration_status()
     sms_limit = _sms_max_recipients()
     sms_attempted = 0
@@ -1123,7 +1835,7 @@ def activate_affected_zone_alert(
             else:
                 status = "sms_suppressed"
 
-    return {
+    result = {
         "zone_id": str(feature["properties"].get("zone_id")),
         "risk_level": risk_level,
         "recipient_count": len(recipients),
@@ -1143,6 +1855,26 @@ def activate_affected_zone_alert(
         "simulation_mode": simulation_enabled,
         "external_sms_sent": sms_sent > 0,
     }
+    event_type = "ALERT_ACTIVATED" if created_count > 0 else "ALERT_ACTIVATION_FAILED"
+    try_record_audit_event(
+        db,
+        event_type=event_type,
+        mode="REAL",
+        zone_id=result["zone_id"],
+        zone_name=str(feature["properties"].get("name") or req.zone_id),
+        risk=risk_level,
+        message="Configured-zone alert activation completed." if created_count > 0 else "Configured-zone alert activation created no new alerts.",
+        metadata={
+            "recipientCount": len(recipients),
+            "status": status,
+            "smsRequested": req.send_sms,
+            "smsSent": sms_sent,
+            "smsFailed": sms_failed,
+            "smsSuppressed": sms_suppressed,
+            "externalNotificationsSuppressed": not bool(sms_sent),
+        },
+    )
+    return result
 
 
 @app.get("/admin/simulation/state")
@@ -1152,11 +1884,153 @@ def admin_simulation_state(
     return simulation_mode.read_state()
 
 
+@app.get("/admin/simulation/kodagu/locations")
+def admin_kodagu_simulation_locations(_: dict = Depends(require_admin)) -> dict[str, Any]:
+    return {
+        "locations": list(KODAGU_LOCATIONS),
+        "risk_levels": ["HIGH", "CRITICAL"],
+        "source_note": "Location references derived from the uploaded Geological Survey of India report on landslide susceptibility mapping in parts of Coorg (Kodagu), Karnataka.",
+        "classification_note": "Simulation risk levels HIGH and CRITICAL are LandSense demonstration states and are not direct classifications from the GSI report.",
+    }
+
+
+def _active_demo_state(scenario_revision: str | None = None) -> dict[str, Any]:
+    state = simulation_mode.read_state()
+    if not (state.get("enabled") and state.get("is_simulation")):
+        raise HTTPException(status_code=409, detail="Enable Kodagu Simulation Mode to view the demonstration.")
+    if scenario_revision is not None and state.get("enabled_at_utc") != scenario_revision:
+        raise HTTPException(status_code=409, detail="Simulation changed. Refresh the demonstration before exporting.")
+    return state
+
+
+@app.get("/admin/simulation/demo")
+@app.get("/admin/simulation")
+@app.get("/frontend/admin/simulation")
+@app.get("/frontend/admin/simulation/demo")
+def simulation_demo_page() -> FileResponse:
+    # Static shell has no simulation data; ProtectedRoute gates the UI and
+    # every data/export endpoint independently requires Admin authorization.
+    return _web_ui_asset("index.html", media_type="text/html")
+
+
+@app.get("/admin/simulation/demo/state")
+def admin_simulation_demo(_: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    state = simulation_mode.read_state()
+    active = bool(state.get("enabled") and state.get("is_simulation"))
+    preview = None
+    if active and state.get("synthetic_zone"):
+        result = _httpsms_export_preview(state["synthetic_zone"]["properties"]["zone_id"], db)
+        _active_demo_state(state["enabled_at_utc"])
+        preview = {key: value for key, value in result.items() if not key.startswith("_")}
+    return {"active": active, "state": state if active else None, "preview": preview}
+
+
+def _demo_export_preview(req: SimulationDemoExportRequest, db: Session) -> dict[str, Any]:
+    state = _active_demo_state(req.scenario_revision)
+    feature = state.get("synthetic_zone")
+    if not feature:
+        raise HTTPException(status_code=422, detail="Danger-zone geometry unavailable for this simulation location.")
+    message = req.message.strip()
+    if not message:
+        raise HTTPException(status_code=422, detail="Enter a simulation message before generating Excel.")
+    result = _httpsms_export_preview(feature["properties"]["zone_id"], db, set(req.recipient_ids))
+    result["message"] = message
+    result["revision"] = hashlib.sha256(repr((result["revision"], message, req.scenario_revision)).encode()).hexdigest()
+    _active_demo_state(req.scenario_revision)
+    return result
+
+
+@app.post("/admin/simulation/demo/httpsms-preview")
+def admin_demo_excel_preview(req: SimulationDemoExportRequest, _: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    result = _demo_export_preview(req, db)
+    return {key: value for key, value in result.items() if not key.startswith("_")}
+
+
+@app.post("/admin/simulation/demo/httpsms-excel")
+def admin_demo_excel(req: SimulationDemoExportRequest, _: dict = Depends(require_admin), db: Session = Depends(get_db)):
+    result = _demo_export_preview(req, db)
+    if not result["download_enabled"]:
+        raise HTTPException(status_code=422, detail=result["error"])
+    if not req.revision or req.revision != result["revision"]:
+        raise HTTPException(status_code=409, detail="Recipients or message changed. Refresh recipients before downloading.")
+    try:
+        content = build_workbook(result["_sender"], result["_phones"], result["message"])
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Unable to generate httpSMS Excel. Please retry.") from exc
+    _active_demo_state(req.scenario_revision)
+    return Response(content=content,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="{result["filename"]}"',
+                             "Cache-Control": "no-store", "X-Recipient-Count": str(result["sms_eligible_count"])})
+
+
+@app.post("/admin/simulation/kodagu/create")
+def admin_create_kodagu_simulation(
+    req: KodaguSimulationRequest,
+    _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    zones_geo = load_zones(ZONE_PATH)
+    # Geography may only be reused when an exact-name feature is explicitly
+    # marked verified. No fuzzy location matching or coordinate invention.
+    verified_feature = next((feature for feature in zones_geo.get("features", []) if
+        str((feature.get("properties") or {}).get("name") or "").strip() == req.location.strip()
+        and (feature.get("properties") or {}).get("verified") is True), None)
+    try:
+        state = simulation_mode.create_kodagu(location=req.location, risk=req.risk_level, verified_feature=verified_feature)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    feature = state.get("synthetic_zone")
+    recipients: list[dict[str, Any]] = []
+    sms_eligible = 0
+    route = state.get("route")
+    if feature:
+        _total, members = _feature_population(feature, db)
+        recipients = [{
+            "display_id": _safe_citizen_id(member["_user_id"]),
+            "phone_masked": _mask_phone(member["_phone_number"]),
+            "sms_eligible": bool(member["sms_eligible"]),
+        } for member in members if member["inside"]]
+        sms_eligible = sum(bool(member["sms_eligible"]) for member in members if member["inside"])
+        geometry = feature.get("geometry") or {}
+        ring = (geometry.get("coordinates") or [[]])[0]
+        center = None
+        if ring:
+            center = (sum(float(p[1]) for p in ring) / len(ring), sum(float(p[0]) for p in ring) / len(ring))
+        safe_features = [item for item in zones_geo.get("features", []) if str((item.get("properties") or {}).get("risk_level") or "").upper() in {"SAFE", "LOW"}]
+        if center and safe_features:
+            guidance = safe_route_service.build_guidance(center[0], center[1], {"type": "FeatureCollection", "features": [feature, *safe_features]}, req.risk_level)
+            if guidance and (guidance.get("route") or {}).get("status") == "ok":
+                route = guidance
+    state = simulation_mode.set_kodagu_results(recipients=recipients, sms_eligible_users=sms_eligible, route=route)
+    return {"state": state, "generated": bool(feature), "message": "Generated synthetic zone for simulation." if feature else "Synthetic zone unavailable: no verified project geometry exists for this report-backed location."}
+
+
+@app.post("/admin/simulation/kodagu/trigger")
+def admin_trigger_kodagu_simulation(req: KodaguSimulationTriggerRequest, _: dict = Depends(require_admin)) -> dict[str, Any]:
+    try:
+        state = simulation_mode.trigger_kodagu(req.recipient_ids)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"state": state, "sent": False, "external_notifications_sent": 0, "message": "Demo alert confirmed. No SMS or live alert was sent."}
+
+
+@app.post("/admin/simulation/kodagu/reset")
+def admin_reset_kodagu_simulation(_: dict = Depends(require_admin), db: Session = Depends(get_db)) -> dict[str, Any]:
+    previous = simulation_mode.read_state()
+    state = simulation_mode.set_state(enabled=False, forced_risk="LOW", escalation_enabled=False, scenario_name="Normal", zones_geo=None)
+    try_record_audit_event(db, event_type="SIMULATION_STOPPED", mode="SIMULATION", zone_id=previous.get("danger_zone_id"), zone_name=previous.get("location"), risk=previous.get("effective_risk"), message="Kodagu simulation reset; real data was not modified.", metadata={"isSimulation": True})
+    return {"state": state, "real_data_modified": False}
+
+
 @app.post("/admin/simulation/state")
 def admin_simulation_toggle(
     req: SimulationToggleRequest,
     _: dict = Depends(require_admin),
+    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    previous = simulation_mode.read_state()
     zones_geo = load_zones(ZONE_PATH)
     state = simulation_mode.set_state(
         enabled=req.enabled,
@@ -1165,6 +2039,21 @@ def admin_simulation_toggle(
         scenario_name=req.scenario_name,
         zones_geo=zones_geo,
     )
+    if req.enabled != bool(previous.get("enabled")):
+        try_record_audit_event(
+            db,
+            event_type="SIMULATION_STARTED" if req.enabled else "SIMULATION_STOPPED",
+            mode="SIMULATION",
+            zone_id=state.get("danger_zone_id") or previous.get("danger_zone_id"),
+            zone_name=state.get("danger_zone_name") or previous.get("danger_zone_name"),
+            risk=state.get("effective_risk") if req.enabled else previous.get("effective_risk"),
+            message="Admin Simulation Mode started; real activation remains disabled." if req.enabled else "Admin Simulation Mode stopped and simulated state was cleared.",
+            metadata={
+                "scenarioName": req.scenario_name if req.enabled else previous.get("scenario_name"),
+                "forcedRisk": req.forced_risk if req.enabled else previous.get("forced_risk"),
+                "externalNotificationsSuppressed": True,
+            },
+        )
     return {"state": state}
 
 

@@ -48,6 +48,19 @@ class WeatherExtensionTests(unittest.TestCase):
         self.assertEqual(result["source_type"], "unavailable")
         self.assertEqual(result["rainfall_mm"], 0.0)
 
+    def test_synthetic_fallback_only_marks_rainfall_as_available(self) -> None:
+        result = WeatherExtensionService(providers=[StaticProvider(None)], allow_simulated_fallback=True).fetch_weather_context(18.4, 73.2)
+
+        self.assertEqual(result["source_type"], "simulated")
+        self.assertEqual(result["available_fields"], ["rainfall_mm"])
+
+    def test_provider_field_availability_is_preserved(self) -> None:
+        provider = StaticProvider({"rainfall_mm": 8.0, "available_fields": ["rainfall_mm"]})
+        result = WeatherExtensionService(providers=[provider]).fetch_weather_context(18.4, 73.2)
+
+        self.assertEqual(result["source_type"], "real")
+        self.assertEqual(result["available_fields"], ["rainfall_mm"])
+
     def test_weather_cache_reuses_provider_snapshot(self) -> None:
         provider = StaticProvider({"rainfall_mm": 3.0})
         service = WeatherExtensionService(providers=[provider])

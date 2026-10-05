@@ -60,6 +60,10 @@ def plan_safe_route(
     """
     Compute a safe route using Dijkstra, penalizing medium/high-risk grid cells.
     """
+    # Expand the grid spacing for destinations outside the original local
+    # window while retaining the finer 0.003-degree resolution nearby.
+    coordinate_span = max(abs(end_lat - start_lat), abs(end_lon - start_lon))
+    step_deg = max(step_deg, coordinate_span / max(1, grid_size - 5))
     center_lat = (start_lat + end_lat) / 2.0
     center_lon = (start_lon + end_lon) / 2.0
     lat0 = center_lat - (grid_size // 2) * step_deg
@@ -120,6 +124,10 @@ def plan_safe_route(
     geo_distance = 0.0
     for idx, (i, j) in enumerate(path_idx):
         lat, lon = _index_to_coord(i, j, lat0, lon0, step_deg)
+        if idx == 0:
+            lat, lon = start_lat, start_lon
+        elif idx == len(path_idx) - 1:
+            lat, lon = end_lat, end_lon
         path_coords.append({"latitude": lat, "longitude": lon})
         if idx > 0:
             p = path_coords[idx - 1]

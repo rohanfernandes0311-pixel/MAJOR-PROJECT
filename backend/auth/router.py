@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from firebase_admin import exceptions as firebase_exceptions
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import SQLAlchemyError
 
 from auth_security import new_jti, request_fingerprint, utc_now
 from backend.auth.firebase_verify import exchange_firebase_token
@@ -16,6 +18,7 @@ from datetime import timedelta
 
 
 router = APIRouter(tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 class FirebaseExchangeRequest(BaseModel):
@@ -40,6 +43,12 @@ def post_firebase_exchange(req: FirebaseExchangeRequest, request: Request) -> di
         )
     except (ValueError, firebase_exceptions.FirebaseError) as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except SQLAlchemyError as exc:
+        logger.exception("Firebase exchange failed because database access was unavailable")
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to complete sign-in right now. Please try again.",
+        ) from exc
 
 
 @router.post("/auth/refresh")

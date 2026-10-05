@@ -5,6 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 import backend_api
@@ -157,13 +158,20 @@ class TargetedSmsTests(unittest.TestCase):
         self.assertEqual(result["sms_suppressed"], 1)
         sender.assert_not_called()
 
-    def test_simulation_mode_suppresses_real_sms_without_provider_call(self):
+    def test_simulation_mode_rejects_real_activation_without_writes_or_provider_call(self):
         db = _SmsDb([(_user("one", "+919876543210"), _location())], [1, "HIGH"])
-        result, sender = self._activate(db, simulation=True)
+        sender = Mock()
+        with (
+            patch.object(backend_api, "send_sms_alert", sender),
+            patch.object(backend_api, "simulation_mode", SimpleNamespace(read_state=lambda: {"enabled": True})),
+            self.assertRaises(HTTPException) as raised,
+        ):
+            backend_api.activate_affected_zone_alert(_request(), {"role": "Admin"}, db)
 
-        self.assertEqual(result["status"], "simulation_sms_suppressed")
-        self.assertTrue(result["simulation_mode"])
-        self.assertEqual(result["sms_suppressed"], 1)
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("disabled", raised.exception.detail)
+        self.assertEqual(db.created, [])
+        self.assertEqual(db.commits, 0)
         sender.assert_not_called()
 
     def test_batch_limit_refuses_all_sms_without_silent_truncation(self):
@@ -255,6 +263,35 @@ class TargetedSmsTests(unittest.TestCase):
         self.assertEqual(admin.status_code, 200)
         self.assertEqual(citizen.status_code, 403)
         self.assertEqual(missing.status_code, 401)
+
+    def test_direct_http_activation_is_rejected_before_all_work_in_simulation_mode(self):
+        db = _SmsDb([(_user("one", "+919876543210"), _location())], [1, "HIGH"])
+        backend_api.app.dependency_overrides[get_db] = lambda: db
+        selection = Mock(side_effect=AssertionError("recipient calculation must not run"))
+        sender = Mock(side_effect=AssertionError("SMS provider must not run"))
+        client = TestClient(backend_api.app, base_url="https://testserver")
+        payload = {
+            "zone_id": "RGD-01", "risk_level": "HIGH", "message": "Safety bypass regression",
+            "duration_minutes": 60, "send_sms": True,
+        }
+        try:
+            with (
+                patch("backend.auth.middleware.jwt_service.decode_token", return_value={"sub": "admin", "jti": "active", "role": "Admin"}),
+                patch("backend.auth.middleware.is_user_session_active", return_value=True),
+                patch.object(backend_api, "simulation_mode", SimpleNamespace(read_state=lambda: {"enabled": True})),
+                patch.object(backend_api, "_affected_zone_recipients", selection),
+                patch.object(backend_api, "send_sms_alert", sender),
+            ):
+                response = client.post("/admin/affected-zones/activate", headers={"Authorization": "Bearer admin"}, json=payload)
+        finally:
+            backend_api.app.dependency_overrides.clear()
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("disabled", response.json()["detail"])
+        selection.assert_not_called()
+        sender.assert_not_called()
+        self.assertEqual(db.created, [])
+        self.assertEqual(db.commits, 0)
 
 
 if __name__ == "__main__":

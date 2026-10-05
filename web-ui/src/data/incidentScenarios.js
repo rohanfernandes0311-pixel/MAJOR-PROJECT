@@ -1,82 +1,10 @@
-// Curated presentation data only. These records are not a live incident feed,
-// configured geofences, or inputs to real recipient targeting.
-export const INCIDENT_SCENARIO_LABEL = 'REAL-WORLD INCIDENT / DEMO SCENARIO'
+import scenarios from './incidentScenarios.json' with { type: 'json' }
 
-export const INCIDENT_SCENARIOS = Object.freeze([
-  {
-    id: 'wayanad-kalladi-2026-07-07', title: 'Wayanad Tunnel Landslide', date: '2026-07-07',
-    state: 'Kerala', district: 'Wayanad', location_name: 'Kalladi near Meppadi',
-    latitude: 11.55, longitude: 76.13, location_precision: 'approximate',
-    deaths: 8, injured: 7, missing: 0, affected_people: null,
-    short_description: 'A major landslide occurred near the tunnel construction site following heavy rainfall. Search and rescue operations recovered the last missing worker.',
-    demo_risk: 'CRITICAL', affected_radius_meters: 1000,
-    source_label: 'Hindustan Times and Associated Press',
-    source_url: 'https://www.hindustantimes.com/india-news/wayanad-landslide-toll-at-eight-as-last-missing-body-recovered-101783885003733.html',
-    verification_status: 'verified'
-  },
-  {
-    id: 'pune-rainfall-landslides-2026-07', title: 'Pune Rainfall-Triggered Landslides', date: '2026-07-06',
-    state: 'Maharashtra', district: 'Pune', location_name: 'Pune district',
-    latitude: 18.75, longitude: 73.41, location_precision: 'approximate',
-    deaths: 4, injured: null, missing: 1, affected_people: null,
-    short_description: 'Severe district-wide rainfall triggered multiple landslides, road closures, evacuations, and rescue operations. More than 20 people were reported injured across the wider rain emergency.',
-    demo_risk: 'HIGH', affected_radius_meters: 25000,
-    source_label: 'The Indian Express', source_url: 'https://indianexpress.com/article/cities/pune-landslides-heavy-rain-maharashtra-10774632/',
-    verification_status: 'verified'
-  },
-  {
-    id: 'ratnagiri-dahivali-2026-07-06', title: 'Ratnagiri Maharashtra Landslide', date: '2026-07-06',
-    state: 'Maharashtra', district: 'Ratnagiri', location_name: 'Dahivali, Khed tehsil',
-    latitude: 17.72, longitude: 73.39, location_precision: 'approximate',
-    deaths: 2, injured: null, missing: 0, affected_people: null,
-    short_description: 'Heavy rainfall triggered a landslide that buried homes in Dahivali village. Emergency teams conducted search and rescue operations.',
-    demo_risk: 'HIGH', affected_radius_meters: 1500,
-    source_label: 'Geological Survey of India — Bhusanket', source_url: 'https://bhusanket.gsi.gov.in/',
-    verification_status: 'verified'
-  },
-  {
-    id: 'doda-thathri-2026-07-07', title: 'Doda Jammu & Kashmir Landslide', date: '2026-07-07',
-    state: 'Jammu & Kashmir', district: 'Doda', location_name: 'Thathri',
-    latitude: 33.1459, longitude: 75.7842, location_precision: 'approximate',
-    deaths: 0, injured: 0, missing: 0, affected_people: null,
-    short_description: 'Heavy overnight rainfall caused a destructive mudslide that damaged houses, shops, vehicles, and local roads in Thathri.',
-    demo_risk: 'HIGH', affected_radius_meters: 1500,
-    source_label: 'Akashvani News', source_url: 'https://newsonair.gov.in/j-several-houses-and-shops-damaged/',
-    verification_status: 'verified'
-  },
-  {
-    id: 'mumbai-ghatkopar-2026-08-12', title: 'Mumbai Ghatkopar Landslide', date: '2026-08-12',
-    state: 'Maharashtra', district: 'Mumbai Suburban', location_name: 'Ghatkopar',
-    latitude: 19.086, longitude: 72.908, location_precision: 'approximate',
-    deaths: 7, injured: 4, missing: 0, affected_people: null,
-    short_description: 'Heavy monsoon rain triggered a hillside collapse onto homes in Ghatkopar. Fire, police, disaster-response, and civic teams carried out rescue work.',
-    demo_risk: 'HIGH', affected_radius_meters: 800,
-    source_label: 'Associated Press', source_url: 'https://apnews.com/article/413691a4ef81319fe2487d77edfb8c81',
-    verification_status: 'verified'
-  },
-  {
-    id: 'mumbai-kurla-2026-08', title: 'Mumbai Kurla Landslide', date: 'August 2026',
-    state: 'Maharashtra', district: 'Mumbai Suburban', location_name: 'Kurla',
-    latitude: 19.0728, longitude: 72.8826, location_precision: 'approximate',
-    deaths: null, injured: null, missing: null, affected_people: null,
-    short_description: 'A demonstration scenario based on documented landslide-prone terrain in Kurla. A matching August 2026 incident has not been independently verified.',
-    demo_risk: 'CRITICAL', affected_radius_meters: 800,
-    source_label: 'Hindustan Times — documented landslide-prone locations',
-    source_url: 'https://www.hindustantimes.com/cities/mumbai-news/57-cr-allotted-to-fix-landslide-prone-spots-101738090496990.html',
-    verification_status: 'source_review_required'
-  },
-  {
-    id: 'madikeri-nh275-2025-07', title: 'Madikeri NH-275 Landslide-Prone Scenario', date: '2025-07-31',
-    state: 'Karnataka', district: 'Kodagu', location_name: 'NH-275 near Madikeri',
-    latitude: 12.4244, longitude: 75.7382, location_precision: 'approximate',
-    deaths: null, injured: null, missing: null, affected_people: null,
-    short_description: 'A retaining wall at a documented historical landslide site developed substantial cracks and prompted precautionary relocation. This is a hazard-context scenario, not a confirmed new landslide.',
-    demo_risk: 'HIGH', affected_radius_meters: 1000,
-    source_label: 'Times of India — Madikeri NH-275 site report',
-    source_url: 'https://timesofindia.indiatimes.com/city/mysuru/retaining-wall-on-mluru-madikeri-highway-develops-cracks-risks-collapse/articleshow/123026369.cms',
-    verification_status: 'source_review_required'
-  }
-])
+// Curated presentation data only. These records are not a live incident feed,
+// configured geofences, or inputs to real recipient targeting. The backend
+// reads the same catalog for Admin explainability, so provenance cannot drift.
+export const INCIDENT_SCENARIO_LABEL = 'REAL-WORLD INCIDENT / DEMO SCENARIO'
+export const INCIDENT_SCENARIOS = Object.freeze(scenarios.map((scenario) => Object.freeze(scenario)))
 
 export function getIncidentScenario(id) {
   return INCIDENT_SCENARIOS.find((scenario) => scenario.id === String(id || '')) || null

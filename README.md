@@ -253,3 +253,72 @@ See:
 
 - Designed to stay lightweight and understandable.
 - Real-world deployment needs richer ground-truth data, calibrated geofences, and road-network routing.
+# Admin httpSMS Excel export
+
+This feature uses existing PostgreSQL users, alert preferences, and saved `locations`
+coordinates. Saved coordinates persist while users are offline; subsequent normal
+location updates replace them as before. Users without a saved location are not
+included. No new registration system or database migration is required.
+
+1. Install backend dependencies: `python -m pip install -r requirements.txt`.
+2. Set `HTTPSMS_FROM_NUMBER` in `files (2)/.env` to your httpSMS Android sender
+   number, including its country code. Restart the backend after configuration.
+3. Build the frontend with `npm ci` then `npm run build` in `web-ui`, and start
+   LandSense using the existing startup instructions below.
+4. Log in as admin and enable Simulation Mode.
+5. Select a configured HIGH or CRITICAL danger zone using the existing zone
+   selector or map. Selecting its polygon prepares the export preview; live
+   alert activation is not required. Existing synthetic citizen markers and
+   catalog incident demos are separate from this configured-zone export.
+6. Review **Eligible Users** and explicitly check the intended recipients.
+   **Selected Recipients** starts at zero. Being inside the zone does not select
+   a user. Review the message before downloading.
+7. Click **Download httpSMS Excel** explicitly.
+8. Manually upload the downloaded workbook to httpSMS. httpSMS sends the SMS
+   through your configured Android phone and SIM. LandSense does not send SMS
+   from this feature and does not require an httpSMS API key.
+
+The workbook contains exactly `FromPhoneNumber`, `ToPhoneNumber`, `Content`, and
+`SendTime(optional)` with one row per unique, valid, opted-in phone number that
+is both inside the selected polygon and explicitly selected by the Admin.
+Omitted or empty selections never export the entire eligible population.
+Indian mobile numbers with 10 digits or a `91` prefix are normalized to `+91`;
+whitespace is removed. Ambiguous or invalid numbers are excluded and listed by
+the dashboard's existing privacy-safe citizen identifiers. Explicit international
+numbers receive E.164 syntax validation, which does not verify SIM ownership or
+deliverability. No generated workbook is stored on the server.
+
+Admin-only API routes (existing Bearer authentication):
+
+- `GET /admin/affected-zones/{zone_id}/httpsms-preview?recipient_ids={selected_display_ids}`
+- `GET /admin/affected-zones/{zone_id}/httpsms-excel?revision={preview_revision}&recipient_ids={selected_display_ids}`
+- `GET /admin/simulation/visual/recipients?location={approved_location}&risk={HIGH_or_CRITICAL}`
+- `POST /admin/simulation/visual/registered-excel`
+
+The dedicated Simulation Demonstration page uses the existing approved simulation
+polygons with registered users' saved coordinates. It keeps each location/risk's
+selection and edited message independent, and exports selected groups in separate
+worksheets. The POST body contains `scenarios`, each with `location`, `risk`,
+`revision`, `message`, and explicit `recipient_ids` (the preview's display IDs).
+The backend recomputes eligibility and rejects outside users or changed previews.
+Reset clears local selections, previews, messages, and controls; it never changes
+real users, roles, Firebase, or production alerts. Existing fictional map/route
+fixtures remain illustrative and are not used as registered recipients.
+
+The Admin Simulation Actor is a purple diamond labeled as simulated, not real GPS.
+It uses only the selected location's existing configured center after checking that
+the point lies inside the selected simulation polygon. Missing or invalid positions
+are reported without generating replacement coordinates. The actor lives in the
+temporary demo scenario, moves with location/risk selection, and is removed on reset.
+It never enters the registered-user list, saved-location persistence, location-event
+history, or Excel recipient selection. The existing demonstration route retains its
+original start point; it is not presented as a route calculated from the actor.
+
+The dashboard supplies the preview revision. If recipients or zone/message
+information changes, download returns 409 and asks the admin to refresh before
+downloading. Missing sender configuration, empty eligible populations, disabled
+simulation, and unavailable zones disable the button or return clear errors.
+
+Run export tests from `files (2)` with
+`python -m unittest discover -s tests -p test_httpsms_export.py -v`.
+Tests use an isolated database and do not send SMS.

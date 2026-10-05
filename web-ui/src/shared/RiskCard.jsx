@@ -1,29 +1,29 @@
 const RISK_CONFIG = {
-  SAFE: { color: 'bg-emerald-500', label: 'Outside configured risk zones' },
-  'MEDIUM RISK': { color: 'bg-yellow-500', label: 'Stay alert' },
-  'HIGH RISK': { color: 'bg-orange-500', label: 'High risk' },
-  'CRITICAL RISK': { color: 'bg-red-600', label: 'Critical risk' },
-  '--': { color: 'bg-slate-600', label: 'Awaiting live update' }
+  SAFE: { color: 'bg-emerald-600', label: 'Safe conditions', advice: 'No configured risk zone detected nearby.' },
+  LOW: { color: 'bg-emerald-600', label: 'Low risk conditions', advice: 'Continue monitoring local safety guidance.' },
+  'MEDIUM RISK': { color: 'bg-amber-500', label: 'Stay alert', advice: 'Monitor updates and avoid vulnerable slopes.' },
+  'HIGH RISK': { color: 'bg-red-600', label: 'Avoid vulnerable areas', advice: 'Follow safety guidance and prepare to move.' },
+  'CRITICAL RISK': { color: 'bg-red-800', label: 'Move to a safer location', advice: 'Follow evacuation and official guidance now.' },
+  '--': { color: 'bg-slate-500', label: 'Checking your location', advice: 'Risk status will appear after a location update.' }
 }
 
-export default function RiskCard({ risk = 'SAFE', confidence = 0.9, rainfall = 0, recommendation = 'Monitoring is active' }){
+export default function RiskCard({ risk = 'SAFE', confidence = 0.9, rainfall = 0, recommendation = 'Monitoring is active', updated = 'Not yet' }) {
   const config = RISK_CONFIG[risk] || RISK_CONFIG.SAFE
-  
+
   return (
-    <div className="rounded-xl bg-white/6 p-4 flex items-center gap-4">
-      <div className={`w-20 h-20 rounded-full flex items-center justify-center ${config.color} shadow-lg`} aria-hidden>
-        <div className="text-black font-bold">{risk === 'SAFE' ? '✓' : '!'}</div>
-      </div>
+    <section aria-label="Current landslide risk" data-risk={risk} className="risk-card ls-card flex items-center gap-4 p-4 sm:p-5">
+      <div className={`h-14 w-2 shrink-0 rounded-full ${config.color}`} aria-hidden />
       <div className="flex-1">
-        <div className="text-sm text-slate-200">{config.label}</div>
-        <div className="text-lg font-bold mt-1">{risk}</div>
-        <div className="mt-1 text-xs text-slate-300">{recommendation}</div>
-        <div className="flex gap-4 mt-2 text-sm text-slate-300">
-          <div>Confidence: <strong>{Math.round(confidence * 100)}%</strong></div>
-          <div>Rainfall: <strong>{rainfall} mm</strong></div>
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current landslide risk</div>
+        <div className="risk-card-value mt-1 text-2xl font-bold">{risk}</div>
+        <div className="mt-1 text-sm font-medium text-slate-700">{config.label}</div>
+        <div className="mt-1 text-sm text-slate-500">{config.advice || recommendation}</div>
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+          <div>Confidence <strong className="text-slate-700">{Math.round(confidence * 100)}%</strong></div>
+          <div>Rainfall <strong className="text-slate-700">{rainfall} mm</strong></div>
         </div>
+        <div className="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Risk assessment · Updated {updated}</div>
       </div>
-      <button className="px-4 py-2 rounded-md bg-emerald-400 text-black font-semibold">Safety plan</button>
-    </div>
+    </section>
   )
 }

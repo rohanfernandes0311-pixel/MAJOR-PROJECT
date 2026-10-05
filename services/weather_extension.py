@@ -85,6 +85,11 @@ class OpenWeatherProvider:
                     float(data.get("dt", datetime.now(timezone.utc).timestamp())), timezone.utc
                 ).isoformat(),
                 "internet_ok": True,
+                "available_fields": ["rainfall_mm"]
+                + (["temperature_c"] if "temp" in main else [])
+                + (["humidity_pct"] if "humidity" in main else [])
+                + (["wind_speed_mps"] if "speed" in wind else [])
+                + (["cloud_pct"] if "all" in clouds else []),
             }
         except Exception:
             return None
@@ -123,6 +128,14 @@ class WeatherApiProvider:
                     float(current.get("last_updated_epoch", datetime.now(timezone.utc).timestamp())), timezone.utc
                 ).isoformat(),
                 "internet_ok": True,
+                "available_fields": [
+                    field_name
+                    for field_name, provider_field in (
+                        ("rainfall_mm", "precip_mm"), ("temperature_c", "temp_c"),
+                        ("humidity_pct", "humidity"), ("wind_speed_mps", "wind_kph"), ("cloud_pct", "cloud"),
+                    )
+                    if provider_field in current
+                ],
             }
         except Exception:
             return None
@@ -162,16 +175,13 @@ class NasaPowerProvider:
             observed_date, rainfall_mm = max(valid_readings, key=lambda item: item[0])
             return {
                 "rainfall_mm": rainfall_mm,
-                "temperature_c": 0.0,
-                "humidity_pct": 0.0,
-                "wind_speed_mps": 0.0,
-                "cloud_pct": 0.0,
                 "weather_main": "Unknown",
                 "weather_description": "Unknown",
                 "storm_indicator": bool(rainfall_mm >= 25.0),
                 "source": self.name,
                 "observed_at": observed_date,
                 "internet_ok": True,
+                "available_fields": ["rainfall_mm"],
             }
         except Exception:
             return None
@@ -205,6 +215,11 @@ class ImdWeatherProvider:
                 "source": self.name,
                 "observed_at": str(data.get("timestamp") or data.get("observed_at") or _utc_iso()),
                 "internet_ok": True,
+                "available_fields": ["rainfall_mm"]
+                + (["temperature_c"] if "temperature_c" in data else [])
+                + (["humidity_pct"] if "humidity_pct" in data or "humidity" in data else [])
+                + (["wind_speed_mps"] if "wind_speed_mps" in data or "wind_speed" in data else [])
+                + (["cloud_pct"] if "cloud_pct" in data or "cloud" in data else []),
             }
         except Exception:
             return None
@@ -311,6 +326,11 @@ class WeatherExtensionService:
                         "weather_main": str(result.get("weather_main", "Unknown") or "Unknown"),
                         "weather_description": str(result.get("weather_description", "Unknown") or "Unknown"),
                         "storm_indicator": bool(result.get("storm_indicator", False)),
+                        "available_fields": list(result.get("available_fields") or [
+                            field_name
+                            for field_name in ("rainfall_mm", "temperature_c", "humidity_pct", "wind_speed_mps", "cloud_pct")
+                            if field_name in result
+                        ]),
                     }
                     snapshot = self._finalize(snapshot, cache_hit=False)
                     self._cache[cache_key] = (now, snapshot)
@@ -334,6 +354,7 @@ class WeatherExtensionService:
                 "source_type": SOURCE_SIMULATED,
                 "timestamp": _utc_iso(),
                 "internet_ok": False,
+                "available_fields": ["rainfall_mm"],
             }
         else:
             snapshot = {
@@ -351,6 +372,7 @@ class WeatherExtensionService:
                 "source_type": SOURCE_UNAVAILABLE,
                 "timestamp": _utc_iso(),
                 "internet_ok": False,
+                "available_fields": [],
             }
         snapshot = self._finalize(snapshot, cache_hit=False)
         self._cache[cache_key] = (now, snapshot)
@@ -376,4 +398,5 @@ class WeatherExtensionService:
             "weather_description": context.get("weather_description", "Unknown"),
             "storm_indicator": context.get("storm_indicator", False),
             "weather_severity": context.get("weather_severity", "low"),
+            "available_fields": list(context.get("available_fields") or []),
         }
