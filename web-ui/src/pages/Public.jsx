@@ -154,6 +154,7 @@ export default function Public() {
   const mapRef = useRef(null)
   const alertsRef = useRef(null)
   const safetyRef = useRef(null)
+  const routeRef = useRef(null)
   const alertNotificationManagerRef = useRef(new AlertNotificationManager())
   const alertPollingTimerRef = useRef(null)
   const alertRefreshInFlightRef = useRef(false)
@@ -730,6 +731,11 @@ export default function Public() {
 
   const riskLabel = useMemo(() => getRiskLabel(status.risk), [status.risk])
   const routeGuidanceAvailable = Boolean(location && activeZoneId && isEvacuationRisk(status.risk))
+  const elevatedRisk = isEvacuationRisk(status.risk)
+  const relevantTargetedAlerts = targetedAlerts.filter((alert) => {
+    const risk = normalizeRisk(alert?.risk_level)
+    return risk === 'HIGH' || risk === 'CRITICAL'
+  })
 
   const dismissOfflineEmergency = useCallback(() => {
     clearOfflineEmergencyAlert()
@@ -814,6 +820,26 @@ export default function Public() {
                     <div className="safety-status-value text-lg font-semibold">{banner.title}</div>
                     <div className="mt-1 text-sm text-[#46545e]">{banner.body}</div>
                     <div className="mt-2 text-xs text-[#64727c]">{statusText}</div>
+                    {elevatedRisk ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {routeGuidanceAvailable ? (
+                          <button
+                            type="button"
+                            onClick={() => scrollToSection(routeRef)}
+                            className={`rounded-lg px-3 py-2 text-xs font-bold text-white ${status.risk === 'CRITICAL RISK' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-orange-700 hover:bg-orange-800'}`}
+                          >
+                            View safe route
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={speakBanner}
+                          className="rounded-lg border border-slate-300 bg-white/70 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white"
+                        >
+                          Play safety guidance
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                   <button
                     onClick={speakBanner}
@@ -869,10 +895,11 @@ export default function Public() {
                   <p className="mt-1 text-xs text-slate-500">The current assessment is shown without fabricating historical readings.</p>
                 </section>
 
-                <section ref={alertsRef} id="targeted-alerts" className="citizen-alerts scroll-mt-16 border border-[#dfe5df] bg-white p-4">
+                <section ref={alertsRef} id="targeted-alerts" className={`citizen-alerts scroll-mt-16 border bg-white p-4 ${elevatedRisk && relevantTargetedAlerts.length ? 'border-red-300/70 shadow-lg shadow-red-900/10' : 'border-[#dfe5df]'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold">Active alerts</div>
+                      {elevatedRisk && relevantTargetedAlerts.length ? <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-red-700">Active alert for elevated risk</div> : null}
                     </div>
                     <div className="flex items-center gap-3">
                       <button type="button" onClick={refreshTargetedAlerts} className="text-xs font-semibold text-cyan-200 hover:text-cyan-100">Refresh</button>
@@ -888,7 +915,7 @@ export default function Public() {
                 </section>
 
                 {routeGuidanceAvailable ? (
-                <div className="citizen-route">
+                <div ref={routeRef} className="citizen-route scroll-mt-16">
                   <EvacuationPanel risk={status.risk} destination={destinationText} route={route} loading={routeLoading} error={routeError} onDestinationChange={(value) => { setDestinationText(value); setRoute(null); setRouteError('') }} onFindRoute={findSaferRoute} onReplayGuidance={speakBanner} />
                 </div>
                 ) : null}

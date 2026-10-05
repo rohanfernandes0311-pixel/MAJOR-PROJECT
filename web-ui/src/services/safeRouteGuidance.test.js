@@ -56,3 +56,22 @@ test('guidance is cautious and never claims absolute safety', async () => {
   assert.match(panel, /follow official instructions/)
   assert.doesNotMatch(panel, /100% safe|completely safe|guaranteed safe/i)
 })
+
+test('elevated Citizen warnings expose existing route and safety-guidance actions without auto-routing', async () => {
+  const [publicSource, panel] = await Promise.all([readFile(publicUrl, 'utf8'), readFile(panelUrl, 'utf8')])
+  assert.match(publicSource, /const elevatedRisk = isEvacuationRisk\(status\.risk\)/)
+  assert.match(publicSource, /View safe route/)
+  assert.match(publicSource, /Play safety guidance/)
+  assert.match(publicSource, /scrollToSection\(routeRef\)/)
+  assert.match(panel, /Play safety guidance/)
+  assert.match(publicSource, /relevantTargetedAlerts = targetedAlerts\.filter/)
+  assert.match(publicSource, /Active alert for elevated risk/)
+  assert.doesNotMatch(publicSource, /onClick=\{findSaferRoute\}/)
+})
+
+test('elevated warning actions remain gated by the existing in-zone risk state', async () => {
+  const source = await readFile(publicUrl, 'utf8')
+  assert.match(source, /routeGuidanceAvailable = Boolean\(location && activeZoneId && isEvacuationRisk\(status\.risk\)\)/)
+  assert.match(source, /elevatedRisk \? \(/)
+  assert.match(source, /if \(!isEvacuationRisk\(status\.risk\)\)/)
+})

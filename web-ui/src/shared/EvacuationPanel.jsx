@@ -16,7 +16,7 @@ export default function EvacuationPanel({ risk = 'SAFE', destination = '', route
           <h2 id="safe-route-title" className="mt-1 text-xl font-black">{critical ? 'CRITICAL LANDSLIDE RISK' : 'HIGH LANDSLIDE RISK'}</h2>
           <p className="mt-2 text-sm text-white/90">{critical ? 'You are currently inside a critical-risk zone. Move away from the affected area and follow official emergency guidance.' : 'You are inside a high-risk zone. Avoid the affected area and prepare to move if local authorities advise it.'}</p>
         </div>
-        <button type="button" onClick={onReplayGuidance} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold">Replay warning</button>
+        <button type="button" onClick={onReplayGuidance} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold">Play safety guidance</button>
       </div>
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
