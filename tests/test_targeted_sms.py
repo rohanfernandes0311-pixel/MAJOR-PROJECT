@@ -210,7 +210,7 @@ class TargetedSmsTests(unittest.TestCase):
         self.assertEqual(result["status"], "sms_failed")
         self.assertEqual(result["in_app_created_count"], 1)
         self.assertEqual(len(db.created), 1)
-        self.assertEqual(db.created[0].delivered_status, "in_app_pending")
+        self.assertEqual(db.created[0].delivered_status, "real_in_app_pending")
         self.assertEqual(db.commits, 1)
         self.assertEqual(sender.call_count, 1)
 

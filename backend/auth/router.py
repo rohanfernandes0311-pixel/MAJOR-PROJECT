@@ -12,7 +12,7 @@ from auth_security import new_jti, request_fingerprint, utc_now
 from backend.auth.firebase_verify import exchange_firebase_token
 from backend.auth import jwt_service
 from backend.auth.middleware import RequireAuthMiddleware
-from backend.auth.otp_store import create_user_session, get_user_session_by_jti, revoke_user_session
+from backend.auth.otp_store import get_user_session_by_id, get_user_session_by_jti, revoke_user_session
 from local_store import get_user
 from datetime import timedelta
 
@@ -42,9 +42,9 @@ def post_firebase_exchange(req: FirebaseExchangeRequest, request: Request) -> di
             user_agent=request.headers.get("user-agent", ""),
         )
     except (ValueError, firebase_exceptions.FirebaseError) as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
+        raise HTTPException(status_code=401, detail="Unable to verify sign-in token") from exc
     except SQLAlchemyError as exc:
-        logger.exception("Firebase exchange failed because database access was unavailable")
+        logger.error("Firebase exchange failed because database access was unavailable")
         raise HTTPException(
             status_code=503,
             detail="Unable to complete sign-in right now. Please try again.",
@@ -61,6 +61,10 @@ def post_refresh(req: TokenRefreshRequest, request: Request) -> dict[str, Any]:
     sub = str(payload.get("sub", "")).strip()
     phone = str(payload.get("phone", "")).strip()
     device = str(payload.get("device", "")).strip() or request_fingerprint(request)
+    sid = str(payload.get("sid", "")).strip()
+    session = get_user_session_by_id(sid) if sid else None
+    if not session or session.get("revoked_at") or session.get("phone_number") != phone or not session.get("token_jti"):
+        raise HTTPException(status_code=401, detail="Session is no longer active")
     # Re-read the role from trusted persisted state.  This prevents a stale
     # refresh token from preserving a role after a server-side role change.
     user = get_user(sub) if sub else None
@@ -68,26 +72,15 @@ def post_refresh(req: TokenRefreshRequest, request: Request) -> dict[str, Any]:
     if not sub or not phone:
         raise HTTPException(status_code=400, detail="Malformed token payload")
 
-    session_id = new_jti()
     new_tokens = jwt_service.issue_auth_tokens(
         subject=sub,
         phone_number=phone,
         device_hash=device,
-        session_id=session_id,
+        session_id=sid,
         role=role,
+        access_jti=str(session["token_jti"]),
     )
-
-    issued_at = utc_now()
     access_expires_minutes = int(new_tokens.get("access_expires_in_minutes", 15))
-    create_user_session(
-        session_id=session_id,
-        phone_number=phone,
-        token_jti=str(new_tokens.get("access_jti")),
-        issued_at=issued_at.isoformat(),
-        expires_at=(issued_at + timedelta(minutes=access_expires_minutes)).isoformat(),
-        last_ip=request.client.host if request.client else "",
-        last_user_agent=request.headers.get("user-agent", ""),
-    )
 
     return {
         "token_type": new_tokens.get("token_type"),

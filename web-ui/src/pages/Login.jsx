@@ -228,6 +228,21 @@ export default function Login() {
             <div ref={recaptchaContainerRef} className="sr-only" aria-hidden="true" />
           </motion.section>
       </div>
+      <section
+        aria-labelledby="about-landsense-title"
+        className="mx-auto w-full max-w-6xl border-t border-[#d8e0dd] px-4 py-5 text-center sm:px-6"
+      >
+        <h2 id="about-landsense-title" className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[#2f5d50]">
+          ABOUT LANDSense
+        </h2>
+        <p className="mt-2 text-[13px] font-normal text-[#18211b]">Developed by</p>
+        <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[14px] font-medium text-[#647067]">
+          <span>Rohan Fernandes</span>
+          <span>Prajwal M</span>
+          <span>Vikas M Gowda</span>
+          <span>Pavithra R</span>
+        </div>
+      </section>
     </div>
   )
 }

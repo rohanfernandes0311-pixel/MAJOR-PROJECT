@@ -17,8 +17,12 @@ class LocalExtractionStorage:
         return job_dir
 
     def save_source_bytes(self, job_id: str, source_name: str, content: bytes) -> Path:
+        if not source_name or source_name in {'.', '..'} or any(c in source_name for c in '/\\:'):
+            raise ValueError("Invalid source filename")
         job_dir = self.create_job_dir(job_id)
         source_path = job_dir / source_name
+        if not source_path.resolve().is_relative_to(job_dir.resolve()):
+            raise ValueError("Invalid source filename")
         source_path.write_bytes(content)
         return source_path
 
@@ -53,9 +57,10 @@ class JobRegistry:
         self._jobs: dict[str, dict] = {}
         self._lock = Lock()
 
-    def create(self, job_id: str, source_name: str, source_path: str) -> dict:
+    def create(self, job_id: str, source_name: str, source_path: str, owner_id: str | None = None) -> dict:
         record = {
             "job_id": job_id,
+            "owner_id": owner_id,
             "status": "queued",
             "source_name": source_name,
             "source_path": source_path,

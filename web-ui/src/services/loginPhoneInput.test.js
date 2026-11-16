@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import { isValidIndianMobileNumber, toIndianE164 } from './indianPhone.js'
 
-const source = await readFile(new URL('../pages/Login.jsx', import.meta.url), 'utf8')
+// Source parsing must work with both Windows CRLF and Unix LF checkouts.
+const source = (await readFile(new URL('../pages/Login.jsx', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
 const input = source.match(/<input\s+id="phone-number"[\s\S]*?\/>/)[0]
 const changeBody = input.match(/onChange=\{\(event\) => \{([\s\S]*?)\n\s*\}\}/)[1]
 const submitBody = source.match(/async function handleSubmit\(event\) \{([\s\S]*?)\n  \}\n/)[1]

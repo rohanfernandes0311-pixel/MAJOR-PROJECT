@@ -1,0 +1,57 @@
+{
+  "generated_at_utc": "2026-10-09T18:18:05+00:00",
+  "purpose": "Spatial terrain matching only; no time-dependent features or labels generated.",
+  "dem": {
+    "product": "NASA SRTM v3 1 arc-second HGT tiles",
+    "distribution": "AWS Open Data terrain-tiles, skadi path",
+    "url_template": "https://s3.amazonaws.com/elevation-tiles-prod/skadi/{lat_band}/{tile}.hgt.gz",
+    "resolution": "1 arc-second (~30 m)",
+    "vertical_units": "metres",
+    "nodata": -32768,
+    "tile_checksums": {
+      "N08E075.hgt.gz": "E6FC67C0B40F5175CAD8AAF120B920D7C94019A0709ADF030F187954408E4914",
+      "N08E076.hgt.gz": "2A1EEC632920E67DE823944DB5C3619469327548B746784070622C65F9E72807",
+      "N08E077.hgt.gz": "CDECFA624ED6264E7E8D301B05E87AC2204BC58934FE81F63D04CA24A987B7FC",
+      "N09E075.hgt.gz": "01BDDF5172A9C62FF484D45A7B402696BEA25C639E3BAA248D93C658327E0EF4",
+      "N09E076.hgt.gz": "516ABC0C43CDB5211486D1002ADA1248F6B59CC3FAB69531AFC49AF686C0B51E",
+      "N09E077.hgt.gz": "36744AA8518E8421F1BDC528B5E1DC4694C6181A1FEF70FE8E4CE8284700AE63",
+      "N10E075.hgt.gz": "BBF2BBF9FD261EFD511399AAAD6712C16C45788A346170BCB8E5A71D03D0C13E",
+      "N10E076.hgt.gz": "7312661A7FA3D02AD7D956F663641284D4E188F655342B07520C0FB7B3E9F4D7",
+      "N10E077.hgt.gz": "2F55A165D6AC8EFA0B4C3DD0EBBBE4469007AC1FCC2BF15FECD6BB4EBE03C059",
+      "N11E075.hgt.gz": "CB788205F6C8DA68A121E0AE7B678520A232F9349A9FC63BB022BFE40C431F6C",
+      "N11E076.hgt.gz": "7BA2967A032F8CBA5F3BBD03B7009DFF97184588E92C1A40A2DB90F0DD0F7406",
+      "N11E077.hgt.gz": "25A28802172476A80177D0467D5445EEA59953DB1377A1A1BC61DF219D28D7E0",
+      "N12E075.hgt.gz": "EE7BB64A7EF85E479C1D546BC9655ECFFAE4F871C1A0E31C3B597EEBABF3B627",
+      "N12E076.hgt.gz": "31A95B390B33BF4743EEFD329586A0AE8943309446719479105F6E98A8C51D73",
+      "N12E077.hgt.gz": "9485BA04696BBE2074A0B6CAB79D0F12ECCA79AD05B19D676EA35056BEAFD14E"
+    }
+  },
+  "outputs": {
+    "kodagu_points": {
+      "path": "data/research/south_india_environmental_features/kodagu_points_terrain.csv",
+      "records": 267,
+      "complete_terrain_records": 267,
+      "sha256": "2F01768D8F88D449476525A2A6354B9383B07DD26D5B87B9506152A991C49C71"
+    },
+    "kodagu_polygons": {
+      "path": "data/research/south_india_environmental_features/kodagu_polygons_terrain.csv",
+      "records": 217,
+      "complete_terrain_records": 217,
+      "sha256": "3FE17046A10DD44127D1D2AB06BF2D8D3C45D6EF52EDE8D10A7AFF27AB7F3304"
+    },
+    "kerala_points": {
+      "path": "data/research/south_india_environmental_features/kerala_points_terrain.csv",
+      "records": 4728,
+      "complete_terrain_records": 4712,
+      "sha256": "2BDFAB80F43431CF9173F695840869CDBED726EC7582681B2CE48B9D1F13BD8B"
+    }
+  },
+  "unavailable_features": {
+    "rainfall_mm": "not_available_for_record: no defensible per-record event date",
+    "soil_moisture_pct": "source_identified_not_downloaded: temporal matching blocked",
+    "ndvi": "source_identified_not_downloaded: temporal matching blocked",
+    "deformation_mm": "requires_scientific_review: Sentinel-1 processing not performed",
+    "velocity_mm_yr": "requires_scientific_review: Sentinel-1 processing not performed",
+    "coherence": "requires_scientific_review: acquisition-pair processing not performed"
+  }
+}

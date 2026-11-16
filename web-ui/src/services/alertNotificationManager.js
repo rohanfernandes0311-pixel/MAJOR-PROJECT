@@ -14,6 +14,12 @@ function isSimulationAlert(alert) {
   )
 }
 
+// The shared alert history also serves drills. Filter once at the Citizen
+// inbox boundary so its presentation and notifications receive only live alerts.
+export function citizenLiveAlerts(alerts) {
+  return (Array.isArray(alerts) ? alerts : []).filter((alert) => !isSimulationAlert(alert))
+}
+
 export function buildNotificationContent(alert) {
   const risk = String(alert?.risk_level || 'RISK ALERT').trim().toUpperCase()
   const simulation = isSimulationAlert(alert)

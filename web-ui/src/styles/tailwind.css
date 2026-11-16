@@ -25,7 +25,52 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 .auth-shell, .citizen-shell { min-height: 100vh; background: var(--ls-canvas) !important; color: var(--ls-text) !important; }
+.landsense-layout { display: flex; min-height: 100vh; background: var(--ls-canvas); color: var(--ls-text); }
+.landsense-layout-content { min-width: 0; flex: 1; transition: margin-left .2s ease; }
+.landsense-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  width: 300px;
+  height: 100vh;
+  flex: 0 0 300px;
+  flex-direction: column;
+  border-right: 1px solid var(--ls-border);
+  background: #fff;
+  transition: width .2s ease, flex-basis .2s ease;
+}
+.landsense-sidebar.is-collapsed { width: 60px; flex-basis: 60px; }
+.landsense-sidebar-header { display: flex; min-height: 60px; align-items: center; gap: .7rem; border-bottom: 1px solid var(--ls-border); padding: .75rem; }
+.landsense-brand-mark { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; overflow: hidden; border-radius: .55rem; background: #eef3ef; }
+.landsense-brand-mark img { width: 28px; height: 28px; object-fit: contain; }
+.landsense-brand-name { overflow: hidden; color: #174832; font-size: .95rem; font-weight: 750; white-space: nowrap; }
+.landsense-sidebar-nav { display: grid; gap: .25rem; padding: .75rem .5rem; }
+.landsense-sidebar-link { display: flex; min-height: 42px; align-items: center; gap: .75rem; overflow: hidden; border-radius: .45rem; padding: .65rem .75rem; color: #46545e; font-size: .9rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.landsense-sidebar-link:hover, .landsense-sidebar-link[aria-current="page"] { background: #edf4f0; color: #2f5d50; }
+.landsense-sidebar-account { display: grid; gap: .75rem; margin: auto .5rem .75rem; border-top: 1px solid var(--ls-border); padding: .75rem .25rem 0; }
+.landsense-account-details { display: flex; min-width: 0; align-items: center; gap: .65rem; padding: 0 .5rem; color: #2f5d50; }
+.landsense-account-details > div { min-width: 0; }
+.landsense-account-phone { overflow: hidden; color: #26352b; font-size: .78rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.landsense-account-role { margin-top: .15rem; color: var(--ls-muted); font-size: .72rem; }
+.landsense-account-logout { display: flex; align-items: center; gap: .65rem; border-radius: .4rem; padding: .55rem .5rem; color: #46545e; font-size: .8rem; font-weight: 600; text-align: left; }
+.landsense-account-logout:hover { background: #f4f7f5; color: #2f5d50; }
+.landsense-sidebar-toggle { display: flex; align-items: center; gap: .7rem; margin: .75rem .5rem .75rem; border: 1px solid var(--ls-border); border-radius: .45rem; padding: .6rem .7rem; color: #46545e; font-size: .8rem; font-weight: 600; }
+.landsense-sidebar-toggle:hover { background: #f4f7f5; }
+.landsense-sidebar.is-collapsed .landsense-sidebar-header { justify-content: center; padding-inline: .5rem; }
+.landsense-sidebar.is-collapsed .landsense-brand-name, .landsense-sidebar.is-collapsed .landsense-sidebar-link span, .landsense-sidebar.is-collapsed .landsense-sidebar-toggle span { display: none; }
+.landsense-sidebar.is-collapsed .landsense-sidebar-link, .landsense-sidebar.is-collapsed .landsense-sidebar-toggle { justify-content: center; }
+.landsense-sidebar.is-collapsed .landsense-sidebar-account { justify-items: center; }
+.landsense-sidebar.is-collapsed .landsense-account-details { justify-content: center; padding-inline: 0; }
+.landsense-sidebar.is-collapsed .landsense-account-details > div, .landsense-sidebar.is-collapsed .landsense-account-logout span { display: none; }
+.landsense-sidebar.is-collapsed .landsense-account-logout { justify-content: center; padding-inline: .5rem; }
+.landsense-sidebar.is-collapsed .landsense-sidebar-toggle svg { transform: rotate(180deg); }
+.landsense-mobile-trigger, .landsense-mobile-close, .landsense-sidebar-backdrop { display: none; }
+.landsense-layout .admin-layout { display: block; max-width: 1600px; }
 .auth-shell.login-shell {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   background-color: #f2f5f0 !important;
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%238fa092' stroke-width='1.2' stroke-opacity='.11'%3E%3Cpath d='M-80 170C95 70 215 248 390 145S680 40 842 146'/%3E%3Cpath d='M-70 207C112 111 229 286 405 181S699 78 867 181'/%3E%3Cpath d='M1180 90c118 72 119 181 252 211s186-38 244-9'/%3E%3Cpath d='M1151 126c126 76 131 190 270 223s194-39 262-7'/%3E%3Cpath d='M-95 734c181-108 314-55 431 43s245 92 372 28'/%3E%3Cpath d='M-101 780c190-112 333-58 454 44s255 96 388 29'/%3E%3C/g%3E%3Cg fill='%237d927f'%3E%3Cpath fill-opacity='.055' d='M0 690C168 590 292 606 430 669c158 72 272 47 416-42 164-101 305-96 459 7 116 78 207 73 295 24v242H0Z'/%3E%3Cpath fill-opacity='.04' d='M0 757c174-69 317-72 472-7 150 63 277 58 424-5 190-82 377-61 704 51v104H0Z'/%3E%3Cg fill-opacity='.07'%3E%3Cpath d='m42 787 24-47 24 47H76l18 35H38l18-35Z'/%3E%3Cpath d='m112 812 18-35 18 35h-10l14 27h-44l14-27Z'/%3E%3Cpath d='m1511 786 25-49 25 49h-14l19 37h-60l19-37Z'/%3E%3Cpath d='m1450 817 18-36 18 36h-10l14 28h-44l14-28Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
@@ -34,6 +79,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background-position: center, center, center !important;
   background-repeat: no-repeat !important;
   background-size: cover !important;
+}
+.auth-shell.login-shell::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: url("/images/landsense-login-forest.png") center / cover no-repeat;
+  content: "";
+  opacity: .22;
+  pointer-events: none;
+}
+.auth-shell.login-shell > div > section:first-child {
+  border: 1px solid rgba(255, 255, 255, .58);
+  border-radius: .75rem;
+  background: rgba(255, 255, 255, .32);
+  box-shadow: 0 2px 12px rgba(39, 59, 45, .06);
+  padding: .25rem;
+}
+.auth-shell.login-shell > div > section:first-child img {
+  border-radius: .6rem;
+}
+.auth-shell.login-shell .ls-card {
+  border: 1px solid rgba(255, 255, 255, .65);
+  background: rgba(255, 255, 255, .84);
+  box-shadow: 0 4px 18px rgba(39, 59, 45, .09);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
 .ls-card { border: 1px solid var(--ls-border); background: var(--ls-surface); border-radius: .5rem; box-shadow: 0 1px 2px rgba(15, 35, 23, 0.04); }
 
@@ -79,6 +150,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .citizen-secondary-action:hover { background: #eaf1ed; }
 .safety-status-label { color: #2f5d50; }
 .safety-status-value { color: #17212b; }
+.citizen-shell .citizen-emergency-route-action { color: #fff !important; }
 .citizen-shell .map-legend { background: rgba(15, 23, 42, .94) !important; border-color: rgba(255,255,255,.3) !important; color: #f8fafc !important; }
 .citizen-shell .map-legend * { color: inherit !important; opacity: 1 !important; }
 .citizen-shell .map-legend > div:first-child { color: #ecfdf5 !important; }
@@ -185,11 +257,139 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .admin-sidebar nav a:hover { background: #e7f0eb; color: #244b40; }
 
 @media (max-width: 900px) {
-  .admin-layout { grid-template-columns: minmax(0, 1fr); }
-  .admin-sidebar { position: static; overflow-x: auto; }
-  .admin-sidebar-brand { display: none; }
-  .admin-sidebar nav { display: flex; min-width: max-content; padding: .35rem; }
-  .admin-sidebar nav a { padding: .55rem .7rem; }
+  .landsense-sidebar { position: fixed; z-index: 1001; left: 0; top: 0; width: min(84vw, 340px); height: 100dvh; flex-basis: min(84vw, 340px); transform: translateX(-105%); transition: transform .2s ease; visibility: hidden; }
+  .landsense-sidebar.is-mobile-open { transform: translateX(0); visibility: visible; }
+  .landsense-sidebar.is-collapsed { width: min(84vw, 340px); flex-basis: min(84vw, 340px); }
+  .landsense-sidebar.is-collapsed .landsense-sidebar-header { justify-content: flex-start; padding-inline: .75rem; }
+  .landsense-sidebar.is-collapsed .landsense-brand-name, .landsense-sidebar.is-collapsed .landsense-sidebar-link span, .landsense-sidebar.is-collapsed .landsense-sidebar-toggle span { display: inline; }
+  .landsense-sidebar.is-collapsed .landsense-sidebar-link, .landsense-sidebar.is-collapsed .landsense-sidebar-toggle { justify-content: flex-start; }
+  .landsense-sidebar.is-collapsed .landsense-sidebar-toggle svg { transform: none; }
+  .landsense-mobile-close { display: inline-grid; margin-left: auto; place-items: center; border: 0; background: transparent; color: #46545e; }
+  .landsense-sidebar-toggle { display: none; }
+  .landsense-mobile-trigger { position: fixed; left: .75rem; top: .75rem; z-index: 30; display: inline-grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--ls-border); border-radius: .5rem; background: #fff; color: #2f5d50; box-shadow: 0 1px 3px rgba(15, 35, 23, .08); }
+  .landsense-sidebar-backdrop { position: fixed; inset: 0; z-index: 1000; display: block; border: 0; background: rgba(23, 33, 43, .24); cursor: default; }
+  .landsense-layout-content { width: 100%; }
+}
+
+@media (max-width: 768px) {
+  .admin-shell { padding-top: 3.5rem !important; }
+  .admin-shell .leaflet-control-zoom { margin-left: .5rem; margin-top: .5rem; }
+  .admin-shell .leaflet-control-layers { margin-right: .5rem; margin-top: 3.25rem; }
+  .admin-shell .admin-map-context {
+    top: .5rem;
+    right: .5rem;
+    max-width: calc(100% - 1rem);
+    padding: .4rem .5rem;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+  .admin-shell .admin-map-context .mt-1 { margin-top: .2rem; font-size: 10px; }
+  .admin-shell .admin-map-context .mt-2 { margin-top: .35rem; gap: .15rem .5rem; }
+  .admin-shell .admin-map-legend {
+    bottom: .5rem;
+    left: .5rem;
+    right: auto;
+    max-width: calc(100% - 1rem);
+    max-height: 42%;
+    padding: .4rem .5rem;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+  .admin-shell .admin-map-legend > div { margin-top: .15rem; }
+  .admin-shell .admin-map-legend > div:first-child { margin-top: 0; margin-bottom: .2rem; }
+  .admin-shell .admin-incident-tooltip {
+    max-width: 150px;
+    font-size: 9px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+  .admin-shell .admin-incident-popup .leaflet-popup-content {
+    margin: .5rem .65rem;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+}
+
+@media (max-width: 768px) {
+  .auth-shell.login-shell > div {
+    align-items: start;
+    gap: 1rem;
+    min-height: 0;
+    padding: 1rem;
+  }
+  .auth-shell.login-shell > div > section:first-child {
+    height: 160px;
+    min-height: 0;
+    max-height: none;
+    margin: 0;
+    padding: .75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .auth-shell.login-shell > div > section:first-child img {
+    width: min(100%, 320px);
+    height: auto;
+    max-width: 320px;
+    max-height: 144px;
+    aspect-ratio: auto;
+    object-fit: contain;
+    transform: scale(1.22);
+    transform-origin: center;
+  }
+  .auth-shell.login-shell .ls-card {
+    width: 100%;
+    margin-inline: auto;
+    box-sizing: border-box;
+  }
+  .auth-shell.login-shell .ls-card {
+    padding: 1.25rem 1.125rem;
+  }
+  .auth-shell.login-shell .ls-card > div:first-child {
+    gap: .625rem;
+  }
+  .auth-shell.login-shell .ls-card h2 {
+    margin-top: 1.125rem;
+    font-size: 1.0625rem;
+  }
+  .auth-shell.login-shell .ls-card h2 + p {
+    font-size: .8125rem;
+  }
+  .auth-shell.login-shell .ls-card > .grid {
+    margin-top: .875rem;
+  }
+  .auth-shell.login-shell .ls-card > .grid button {
+    min-height: 50px;
+    padding: .625rem .5rem;
+    font-size: .75rem;
+  }
+  .auth-shell.login-shell .ls-card form {
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+  .auth-shell.login-shell .ls-card form > * + * {
+    margin-top: .75rem;
+  }
+  .auth-shell.login-shell .ls-card form label {
+    font-size: .8125rem;
+  }
+  .auth-shell.login-shell .ls-card form input,
+  .auth-shell.login-shell .ls-card form [aria-label="India country code"] {
+    padding-top: .625rem;
+    padding-bottom: .625rem;
+  }
+  .auth-shell.login-shell .ls-card > p:last-of-type {
+    margin-top: .875rem;
+  }
+  .landsense-sidebar {
+    height: auto;
+    max-height: 100dvh;
+    min-height: 0;
+  }
+  .landsense-sidebar-account {
+    margin-top: .75rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -200,29 +400,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .admin-environmental-signals .admin-signal { border-bottom: 1px solid var(--ls-border) !important; }
 }
 
-.citizen-nav { min-height: 52px; padding-right: 9rem; }
+.citizen-nav { min-height: 52px; padding-right: 9rem; border-radius: 0; }
 .citizen-nav-link { border-radius: .375rem; padding: .45rem .7rem; color: #38464f; font-weight: 600; }
 .citizen-nav-link:hover { background: #f1f4f2; color: #174832; }
 .section-kicker { color: #2f5d50; font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .citizen-duplicate-summary { display: none; }
 .citizen-dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(270px, .75fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   grid-template-areas:
     "location map"
     "risk map"
-    "controls map"
+    "trend map"
+    "alerts alerts"
+    "environment environment"
     "metrics safety"
     "route route"
-    "trend alerts"
-    "environment environment";
+    "controls controls";
   gap: 1rem;
   align-items: start;
 }
 .citizen-workspace, .citizen-context { display: contents; }
 .citizen-location { grid-area: location; }
 .citizen-risk { grid-area: risk; }
-.citizen-map { grid-area: map; border-radius: .5rem; height: 100%; min-height: 640px; }
+.citizen-map { grid-area: map; border-radius: .5rem; height: 500px; min-height: 0; }
 .citizen-safety { grid-area: safety; }
 .citizen-route { grid-area: route; }
 .citizen-controls { grid-area: controls; }
@@ -236,21 +437,80 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .citizen-metrics > div:nth-child(2) { border-left: 0; padding-left: 0; }
 .citizen-alerts .space-y-2 { margin-top: .75rem; border-top: 1px solid var(--ls-border); }
 .citizen-alerts .space-y-2 > div { margin-top: 0 !important; border: 0 !important; border-bottom: 1px solid var(--ls-border) !important; border-radius: 0 !important; background: transparent !important; padding: .75rem 0 !important; }
+.citizen-shell main.space-y-4 { gap: 1.25rem; }
+.citizen-shell > div { max-width: 1440px; }
+.citizen-shell .max-w-screen-xl {
+  width: min(calc(100% - 48px), 1440px);
+  max-width: 1440px;
+}
+.citizen-shell .citizen-nav { width: min(calc(100% - 48px), 1440px); }
+.citizen-shell [class*="max-w-screen-xl"] + .citizen-dashboard-grid { width: 100%; }
+.citizen-dashboard-container { padding: 0 0 1.25rem; }
+.citizen-shell .citizen-nav,
+.citizen-shell [ref] { box-shadow: none; }
+.citizen-shell .citizen-location,
+.citizen-shell .citizen-risk,
+.citizen-shell .citizen-trend,
+.citizen-shell .citizen-alerts,
+.citizen-shell .citizen-environment,
+.citizen-shell .citizen-metrics,
+.citizen-shell .citizen-safety,
+.citizen-shell .citizen-controls {
+  border-radius: .5rem;
+}
+.citizen-shell .citizen-location > div,
+.citizen-shell .citizen-trend,
+.citizen-shell .citizen-alerts,
+.citizen-shell .citizen-environment,
+.citizen-shell .citizen-metrics,
+.citizen-shell .citizen-safety,
+.citizen-shell .citizen-controls {
+  border-color: var(--ls-border);
+}
+.citizen-shell .citizen-location > div { padding: 1rem; }
+.citizen-shell .citizen-risk > .ls-card { min-height: 0; }
+.citizen-shell .citizen-environment,
+.citizen-shell .citizen-metrics { padding: 1.25rem; }
+.citizen-shell .citizen-environment { grid-template-rows: auto auto auto; }
+.citizen-shell .citizen-environment > h2 { grid-column: 1 / -1; }
+.citizen-shell .citizen-environment > div:not(:first-child) {
+  border-radius: .375rem;
+  background: var(--ls-surface-muted);
+}
+.citizen-shell .citizen-metrics > div:not(:first-child) {
+  padding-top: .25rem;
+  padding-bottom: .25rem;
+}
+.citizen-shell .citizen-alerts { padding: 1.25rem; }
+.citizen-shell .citizen-route > section {
+  border-radius: .5rem;
+  box-shadow: none;
+}
+.citizen-shell .citizen-map {
+  border-radius: .5rem;
+  box-shadow: 0 1px 3px rgba(15, 35, 23, .08);
+}
 
 @media (max-width: 1023px) {
+  .citizen-shell .max-w-screen-xl,
+  .citizen-shell .citizen-nav { width: calc(100% - 32px); }
   .citizen-dashboard-grid {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "location" "risk" "map" "metrics" "safety" "route" "trend" "alerts" "controls" "environment";
+    grid-template-areas: "location" "risk" "map" "trend" "alerts" "environment" "metrics" "safety" "route" "controls";
   }
-  .citizen-map { min-height: 480px; }
+  .citizen-map { height: 440px; min-height: 0; }
 }
 
 @media (max-width: 640px) {
   .citizen-shell { padding: 0 !important; }
+  .citizen-shell main.space-y-4 { gap: 1rem; }
+  .citizen-shell .max-w-screen-xl,
+  .citizen-shell .citizen-nav { width: calc(100% - 24px); }
   .citizen-nav { gap: .75rem; padding-left: .75rem; padding-right: 3.5rem; }
   .citizen-nav-link { padding-inline: .5rem; }
   .session-chip { right: .5rem !important; }
-  .citizen-map { min-height: 390px; }
+  .citizen-map { height: 360px; min-height: 0; }
+  .citizen-dashboard-grid { gap: .75rem; }
   .citizen-metrics { grid-template-columns: minmax(0, 1fr) !important; }
   .citizen-metrics > div:first-child { grid-column: 1 / -1; }
   .citizen-metrics > div:not(:first-child) { border-left: 0; border-top: 1px solid var(--ls-border); padding: .75rem 0; }

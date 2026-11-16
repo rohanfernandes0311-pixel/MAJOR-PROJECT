@@ -119,7 +119,7 @@ class AffectedZonePreviewTests(unittest.TestCase):
         self.assertEqual([alert.user_id for alert in db.created], ["inside"])
         self.assertEqual(db.created[0].risk_level, "HIGH")
         self.assertEqual(db.created[0].message, "Preview only")
-        self.assertEqual(db.created[0].delivered_status, "in_app_pending")
+        self.assertEqual(db.created[0].delivered_status, "real_in_app_pending")
         self.assertEqual(db.commits, 1)
 
     def test_activation_empty_and_duplicate_recipients_create_no_alerts(self):

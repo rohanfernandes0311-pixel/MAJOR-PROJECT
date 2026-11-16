@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import 'leaflet/dist/leaflet.css'
+import { createLifecycleSafeCanvas } from '../services/leafletCanvasLifecycle'
 
 const EMPTY_LAYERS = []
 
@@ -103,7 +104,7 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
       if(cancelled || !ref.current) return
       
       const savedViewport = viewportRef.current
-      map = L.map(ref.current, { zoomControl: true, attributionControl: false, preferCanvas: true, zoomAnimation: !simulationSafeZone }).setView(
+      map = L.map(ref.current, { zoomControl: true, attributionControl: false, preferCanvas: true, renderer: createLifecycleSafeCanvas(L), zoomAnimation: !simulationSafeZone }).setView(
         savedViewport ? [savedViewport.latitude, savedViewport.longitude] : [14.5, 76.2],
         savedViewport?.zoom ?? 6
       )
@@ -355,7 +356,7 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
         const marker = L.circleMarker([incidentLocation.lat, incidentLocation.lng], {
           radius: 12, color: '#ffffff', weight: 3, fillColor: incidentColor, fillOpacity: 1
         }).addTo(map)
-        marker.bindTooltip(`🔴 ${incidentMode ? 'SIMULATED INCIDENT' : 'RECENT INCIDENT · DEMO CONTEXT'}<br>${incidentLocation.title || 'Incident location'}<br>${incidentLocation.date || ''}`, { permanent: true, direction: 'top', opacity: 0.95 })
+        marker.bindTooltip(`🔴 ${incidentMode ? 'SIMULATED INCIDENT' : 'RECENT INCIDENT · DEMO CONTEXT'}<br>${incidentLocation.title || 'Incident location'}<br>${incidentLocation.date || ''}`, { permanent: true, direction: 'top', opacity: 0.95, className: 'admin-incident-tooltip' })
         marker.bindPopup([
           `<b>${incidentMode ? 'SIMULATED INCIDENT' : 'RECENT INCIDENT · DEMO CONTEXT'}</b>`,
           incidentLocation.title || 'Incident location',
@@ -364,7 +365,7 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
           `Classification: ${incidentLocation.classification || `${String(incidentLocation.risk || risk).toUpperCase()} — DEMO CLASSIFICATION`}`,
           `Status: ${incidentLocation.status || 'Active simulation'}`,
           incidentLocation.sourceLabel ? `Source: ${incidentLocation.sourceLabel}` : ''
-        ].filter(Boolean).join('<br>'))
+        ].filter(Boolean).join('<br>'), { className: 'admin-incident-popup' })
         overlays.push(marker)
         marker.bringToFront()
         if (incidentMode) map.setView([incidentLocation.lat, incidentLocation.lng], Number(incidentLocation.zoom) || 13, { animate: true })
@@ -472,7 +473,7 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
     {mapError ? <p role="alert" className="absolute inset-0 z-[1000] flex items-center justify-center bg-slate-900 p-6 text-rose-200">{mapError}</p> : null}
     <div ref={ref} className="h-full w-full" aria-label={simulationSafeZone ? 'Simulation map showing danger zone, saved user locations, simulated Admin actor, evacuation route and safe area' : simulation ? 'Map showing real, simulated citizen, and incident locations separately' : 'Map showing configured risk zones and historical landslide inventory'} />
     {showSimulationLayers && adminSimulationActor?.status === 'available' ? <div className="simulation-actor-label pointer-events-none absolute left-3 top-3 z-[500] rounded-lg border border-purple-300/40 bg-slate-950/90 px-3 py-2 text-xs text-purple-200"><strong>ADMIN SIMULATION ACTOR</strong><br />Simulation only &bull; Not real GPS</div> : null}
-    <div className={`map-legend pointer-events-none absolute bottom-3 ${simulationSafeZone ? 'right-3' : 'left-3'} z-[500] max-h-[70%] space-y-1 overflow-hidden rounded-lg border border-white/20 bg-slate-950/90 px-3 py-2 text-[10px] text-slate-100 shadow-lg`}>
+    <div className={`admin-map-legend map-legend pointer-events-none absolute bottom-3 ${simulationSafeZone ? 'right-3' : 'left-3'} z-[500] max-h-[70%] space-y-1 overflow-hidden rounded-lg border border-white/20 bg-slate-950/90 px-3 py-2 text-[10px] text-slate-100 shadow-lg`}>
       <div className="mb-1 font-bold tracking-[0.14em] text-cyan-100">MAP LEGEND</div>
       {zones.length && !incidentMode ? <div><span className="mr-2 inline-block h-2 w-2 rounded-sm border border-rose-300 bg-rose-500/30" />CONFIGURED · Risk zone</div> : null}
       {selectedZone ? <div><span className="mr-2 inline-block h-2 w-2 rounded-sm border-2 border-cyan-300" />SELECTED · Configured zone</div> : null}
@@ -488,7 +489,7 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
       {simulatedLocation || simulatedCitizens.length ? <div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-orange-500" />SIMULATED · Demo citizen</div> : null}
       {landslideRecords.length ? <div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-violet-500" />HISTORICAL · Landslide inventory</div> : null}
     </div>
-    {mapContext ? <div className="pointer-events-none absolute right-3 top-3 z-[500] max-w-[220px] rounded-lg border border-cyan-200/30 bg-slate-950/90 px-3 py-2 text-[10px] text-slate-100 shadow-lg"><div className="font-bold tracking-[0.12em] text-cyan-100">SELECTED INTELLIGENCE CONTEXT</div><div className="mt-1 text-xs font-semibold">{mapContext.zoneName}</div><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1"><span className="text-slate-400">Risk</span><b>{mapContext.risk || 'Unavailable'}</b><span className="text-slate-400">Users inside</span><b>{mapContext.insideUsers ?? 'Unavailable'}</b><span className="text-slate-400">Recipients</span><b>{mapContext.recipientCount ?? 'Unavailable'}</b><span className="text-slate-400">Recent incident</span><b>{mapContext.incidentStatus}</b></div></div> : !simulationSafeZone && !selectedZone && !incidentLocation ? <div className="pointer-events-none absolute right-3 top-3 z-[500] max-w-[210px] rounded-lg border border-white/15 bg-slate-950/85 px-3 py-2 text-xs text-slate-300 shadow-lg">Select a configured zone to view its intelligence context.</div> : null}
+    {mapContext ? <div className="admin-map-context pointer-events-none absolute right-3 top-3 z-[500] max-w-[220px] rounded-lg border border-cyan-200/30 bg-slate-950/90 px-3 py-2 text-[10px] text-slate-100 shadow-lg"><div className="font-bold tracking-[0.12em] text-cyan-100">SELECTED INTELLIGENCE CONTEXT</div><div className="mt-1 text-xs font-semibold">{mapContext.zoneName}</div><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1"><span className="text-slate-400">Risk</span><b>{mapContext.risk || 'Unavailable'}</b><span className="text-slate-400">Users inside</span><b>{mapContext.insideUsers ?? 'Unavailable'}</b><span className="text-slate-400">Recipients</span><b>{mapContext.recipientCount ?? 'Unavailable'}</b><span className="text-slate-400">Recent incident</span><b>{mapContext.incidentStatus}</b></div></div> : !simulationSafeZone && !selectedZone && !incidentLocation ? <div className="admin-map-context pointer-events-none absolute right-3 top-3 z-[500] max-w-[210px] rounded-lg border border-white/15 bg-slate-950/85 px-3 py-2 text-xs text-slate-300 shadow-lg">Select a configured zone to view its intelligence context.</div> : null}
     {showSimulationLayers ? <div className="pointer-events-none absolute left-14 top-3 z-[500] rounded-lg border border-amber-200/40 bg-amber-500/90 px-2.5 py-1 text-xs font-bold tracking-wide text-slate-950 shadow-lg">⚠ SIMULATION MODE — DEMONSTRATION ONLY</div> : simulation ? <div className="pointer-events-none absolute left-14 top-3 z-[500] rounded-lg border border-amber-200/40 bg-amber-500/90 px-2.5 py-1 text-xs font-bold tracking-wide text-slate-950 shadow-lg">SIMULATION</div> : null}
   </div>
 }

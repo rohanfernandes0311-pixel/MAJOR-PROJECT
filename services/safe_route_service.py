@@ -96,7 +96,7 @@ def _pick_safe_zone(latitude: float, longitude: float, zones_geojson: dict[str, 
         else:
             fallback_candidates.append(zone)
 
-    pool = candidates or fallback_candidates
+    pool = candidates
     if not pool:
         return None
     return sorted(pool, key=lambda item: item["distance_km"])[0]
@@ -123,11 +123,11 @@ class SafeRouteService:
                 "risk_level": normalized_risk,
                 "route": {"path": [], "distance_km": None, "status": "no_safe_zone"},
                 "safe_zone": None,
-                "estimated_direction": "north",
-                "temporary_shelter": "Nearest safer location",
-                "safer_elevation_zone": "Higher ground",
+                "estimated_direction": None,
+                "temporary_shelter": None,
+                "safer_elevation_zone": None,
                 "road_accessibility_status": "Unknown",
-                "summary": "Evacuate toward the nearest available higher ground.",
+                "summary": "No configured safer destination is available. Follow official local emergency guidance.",
                 "weather_context": weather or {},
             }
 

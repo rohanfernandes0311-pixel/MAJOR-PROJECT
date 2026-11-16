@@ -21,6 +21,19 @@ FEATURES  = [
 LABEL_MAP = {0: "Low", 1: "Medium", 2: "High"}
 
 
+def _validated_features(values: list[float]) -> np.ndarray:
+    """Reject malformed sensor input before it reaches a persisted model."""
+    try:
+        array = np.asarray(values, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("All prediction features must be numeric") from exc
+    if array.shape != (len(FEATURES),) or not np.isfinite(array).all():
+        raise ValueError(
+            f"Prediction requires {len(FEATURES)} finite numeric features"
+        )
+    return array
+
+
 def load_models():
     """Load trained RF and XGB models from disk."""
     rf_path  = MODEL_DIR / "random_forest.pkl"
@@ -62,11 +75,12 @@ def predict(
     """
     rf_model, xgb_model = load_models()
 
-    X = np.array([[
+    feature_values = _validated_features([
         deformation_mm, velocity_mm_yr, coherence,
         rainfall_mm, slope_deg, soil_moisture_pct,
         elevation_m, aspect_deg, ndvi
-    ]])
+    ])
+    X = feature_values.reshape(1, -1)
 
     if model == "random_forest":
         proba    = rf_model.predict_proba(X)[0]
@@ -107,7 +121,12 @@ def batch_predict(df: pd.DataFrame, model: str = "ensemble") -> pd.DataFrame:
     if missing:
         raise ValueError(f"DataFrame missing columns: {missing}")
 
-    X = df[FEATURES].values
+    try:
+        X = df[FEATURES].to_numpy(dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("All prediction features must be numeric") from exc
+    if not np.isfinite(X).all():
+        raise ValueError("All prediction features must be finite")
 
     if model == "ensemble":
         proba = (rf_model.predict_proba(X) + xgb_model.predict_proba(X)) / 2

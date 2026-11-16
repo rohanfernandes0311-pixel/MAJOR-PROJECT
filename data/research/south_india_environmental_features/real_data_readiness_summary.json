@@ -1,0 +1,452 @@
+{
+  "analysis": {
+    "name": "LandSense real-data evaluation readiness",
+    "purpose": "Exploratory provenance and coverage analysis only",
+    "classifier_trained": false,
+    "production_models_used": false,
+    "records_analyzed": 5212,
+    "decision": "BLOCKED BY LABEL OR DATA LIMITATIONS"
+  },
+  "inventories": [
+    {
+      "path": "data/research/south_india_environmental_features/kodagu_points_terrain.csv",
+      "records": 267,
+      "unique_source_record_ids": 178,
+      "duplicate_source_record_ids": 89,
+      "coordinate_count": 267,
+      "coordinate_bounds": {
+        "longitude_min": 75.42116388900008,
+        "longitude_max": 75.83268021700009,
+        "latitude_min": 12.405608889000064,
+        "latitude_max": 12.690383333000058
+      },
+      "measurement_status_counts": {
+        "extracted_and_validated": 267
+      },
+      "fields": {
+        "deformation_mm": {
+          "missing": 267,
+          "observed": 0,
+          "available_column": false
+        },
+        "velocity_mm_yr": {
+          "missing": 267,
+          "observed": 0,
+          "available_column": false
+        },
+        "coherence": {
+          "missing": 267,
+          "observed": 0,
+          "available_column": false
+        },
+        "rainfall_mm": {
+          "missing": 267,
+          "observed": 0,
+          "available_column": false
+        },
+        "slope_deg": {
+          "available_column": true,
+          "missing": 0,
+          "observed": 267,
+          "min": 0.9485279829407418,
+          "max": 44.84456193231346,
+          "mean": 19.857607503819658,
+          "median": 19.579340638980018
+        },
+        "soil_moisture_pct": {
+          "missing": 267,
+          "observed": 0,
+          "available_column": false
+        },
+        "elevation_m": {
+          "available_column": true,
+          "missing": 0,
+          "observed": 267,
+          "min": 186.0,
+          "max": 1276.0,
+          "mean": 991.876404494382,
+          "median": 1038.0
+        },
+        "aspect_deg": {
+          "available_column": true,
+          "missing": 0,
+          "observed": 267,
+          "min": 0.0,
+          "max": 357.06826448916337,
+          "mean": 168.7159743203267,
+          "median": 183.66320685265052
+        },
+        "ndvi": {
+          "missing": 267,
+          "observed": 0,
+          "available_column": false
+        },
+        "event_date": {
+          "missing": 267,
+          "observed": 0
+        }
+      }
+    },
+    {
+      "path": "data/research/south_india_environmental_features/kodagu_polygons_terrain.csv",
+      "records": 217,
+      "unique_source_record_ids": 217,
+      "duplicate_source_record_ids": 0,
+      "coordinate_count": 217,
+      "coordinate_bounds": {
+        "longitude_min": 75.4622,
+        "longitude_max": 75.8308,
+        "latitude_min": 12.3862,
+        "latitude_max": 12.6895
+      },
+      "measurement_status_counts": {
+        "extracted_and_validated": 217
+      },
+      "fields": {
+        "deformation_mm": {
+          "missing": 217,
+          "observed": 0,
+          "available_column": false
+        },
+        "velocity_mm_yr": {
+          "missing": 217,
+          "observed": 0,
+          "available_column": false
+        },
+        "coherence": {
+          "missing": 217,
+          "observed": 0,
+          "available_column": false
+        },
+        "rainfall_mm": {
+          "missing": 217,
+          "observed": 0,
+          "available_column": false
+        },
+        "slope_deg": {
+          "available_column": true,
+          "missing": 0,
+          "observed": 217,
+          "min": 0.9485467647998543,
+          "max": 41.77575865540508,
+          "mean": 18.1915692455386,
+          "median": 17.409467528328456
+        },
+        "soil_moisture_pct": {
+          "missing": 217,
+          "observed": 0,
+          "available_column": false
+        },
+        "elevation_m": {
+          "available_column": true,
+          "missing": 0,
+          "observed": 217,
+          "min": 361.0,
+          "max": 1263.0,
+          "mean": 947.2027649769585,
+          "median": 986.0
+        },
+        "aspect_deg": {
+          "available_column": true,
+          "missing": 0,
+          "observed": 217,
+          "min": 0.0,
+          "max": 357.82840419315744,
+          "mean": 160.0159441978581,
+          "median": 175.3161433951949
+        },
+        "ndvi": {
+          "missing": 217,
+          "observed": 0,
+          "available_column": false
+        },
+        "event_date": {
+          "missing": 217,
+          "observed": 0
+        }
+      }
+    },
+    {
+      "path": "data/research/south_india_environmental_features/kerala_points_terrain.csv",
+      "records": 4728,
+      "unique_source_record_ids": 2501,
+      "duplicate_source_record_ids": 2227,
+      "coordinate_count": 4728,
+      "coordinate_bounds": {
+        "longitude_min": 75.015414,
+        "longitude_max": 77.396262389,
+        "latitude_min": 8.474453,
+        "latitude_max": 12.654953
+      },
+      "measurement_status_counts": {
+        "blocked": 16,
+        "extracted_and_validated": 4712
+      },
+      "fields": {
+        "deformation_mm": {
+          "missing": 4728,
+          "observed": 0,
+          "available_column": false
+        },
+        "velocity_mm_yr": {
+          "missing": 4728,
+          "observed": 0,
+          "available_column": false
+        },
+        "coherence": {
+          "missing": 4728,
+          "observed": 0,
+          "available_column": false
+        },
+        "rainfall_mm": {
+          "missing": 4728,
+          "observed": 0,
+          "available_column": false
+        },
+        "slope_deg": {
+          "available_column": true,
+          "missing": 16,
+          "observed": 4712,
+          "min": 0.9465815601250485,
+          "max": 75.76774421983825,
+          "mean": 26.49851798728825,
+          "median": 26.34100907568969
+        },
+        "soil_moisture_pct": {
+          "missing": 4728,
+          "observed": 0,
+          "available_column": false
+        },
+        "elevation_m": {
+          "available_column": true,
+          "missing": 0,
+          "observed": 4728,
+          "min": 21.0,
+          "max": 2465.0,
+          "mean": 796.2842639593908,
+          "median": 750.0
+        },
+        "aspect_deg": {
+          "available_column": true,
+          "missing": 16,
+          "observed": 4712,
+          "min": 0.0,
+          "max": 358.7862995727693,
+          "mean": 171.52831834242355,
+          "median": 184.33831529933798
+        },
+        "ndvi": {
+          "missing": 4728,
+          "observed": 0,
+          "available_column": false
+        },
+        "event_date": {
+          "missing": 4728,
+          "observed": 0
+        }
+      }
+    }
+  ],
+  "source_relationships": {
+    "kodagu_points_and_polygons_are_independent_events": false,
+    "reason": "The source does not provide a one-to-one point/polygon event crosswalk; retain both separately.",
+    "cross_inventory_merge_performed": false,
+    "deduplication_performed": false
+  },
+  "provenance": {
+    "terrain_manifest": {
+      "generated_at_utc": "2026-10-09T18:18:05+00:00",
+      "purpose": "Spatial terrain matching only; no time-dependent features or labels generated.",
+      "dem": {
+        "product": "NASA SRTM v3 1 arc-second HGT tiles",
+        "distribution": "AWS Open Data terrain-tiles, skadi path",
+        "url_template": "https://s3.amazonaws.com/elevation-tiles-prod/skadi/{lat_band}/{tile}.hgt.gz",
+        "resolution": "1 arc-second (~30 m)",
+        "vertical_units": "metres",
+        "nodata": -32768,
+        "tile_checksums": {
+          "N08E075.hgt.gz": "E6FC67C0B40F5175CAD8AAF120B920D7C94019A0709ADF030F187954408E4914",
+          "N08E076.hgt.gz": "2A1EEC632920E67DE823944DB5C3619469327548B746784070622C65F9E72807",
+          "N08E077.hgt.gz": "CDECFA624ED6264E7E8D301B05E87AC2204BC58934FE81F63D04CA24A987B7FC",
+          "N09E075.hgt.gz": "01BDDF5172A9C62FF484D45A7B402696BEA25C639E3BAA248D93C658327E0EF4",
+          "N09E076.hgt.gz": "516ABC0C43CDB5211486D1002ADA1248F6B59CC3FAB69531AFC49AF686C0B51E",
+          "N09E077.hgt.gz": "36744AA8518E8421F1BDC528B5E1DC4694C6181A1FEF70FE8E4CE8284700AE63",
+          "N10E075.hgt.gz": "BBF2BBF9FD261EFD511399AAAD6712C16C45788A346170BCB8E5A71D03D0C13E",
+          "N10E076.hgt.gz": "7312661A7FA3D02AD7D956F663641284D4E188F655342B07520C0FB7B3E9F4D7",
+          "N10E077.hgt.gz": "2F55A165D6AC8EFA0B4C3DD0EBBBE4469007AC1FCC2BF15FECD6BB4EBE03C059",
+          "N11E075.hgt.gz": "CB788205F6C8DA68A121E0AE7B678520A232F9349A9FC63BB022BFE40C431F6C",
+          "N11E076.hgt.gz": "7BA2967A032F8CBA5F3BBD03B7009DFF97184588E92C1A40A2DB90F0DD0F7406",
+          "N11E077.hgt.gz": "25A28802172476A80177D0467D5445EEA59953DB1377A1A1BC61DF219D28D7E0",
+          "N12E075.hgt.gz": "EE7BB64A7EF85E479C1D546BC9655ECFFAE4F871C1A0E31C3B597EEBABF3B627",
+          "N12E076.hgt.gz": "31A95B390B33BF4743EEFD329586A0AE8943309446719479105F6E98A8C51D73",
+          "N12E077.hgt.gz": "9485BA04696BBE2074A0B6CAB79D0F12ECCA79AD05B19D676EA35056BEAFD14E"
+        }
+      },
+      "outputs": {
+        "kodagu_points": {
+          "path": "data/research/south_india_environmental_features/kodagu_points_terrain.csv",
+          "records": 267,
+          "complete_terrain_records": 267,
+          "sha256": "2F01768D8F88D449476525A2A6354B9383B07DD26D5B87B9506152A991C49C71"
+        },
+        "kodagu_polygons": {
+          "path": "data/research/south_india_environmental_features/kodagu_polygons_terrain.csv",
+          "records": 217,
+          "complete_terrain_records": 217,
+          "sha256": "3FE17046A10DD44127D1D2AB06BF2D8D3C45D6EF52EDE8D10A7AFF27AB7F3304"
+        },
+        "kerala_points": {
+          "path": "data/research/south_india_environmental_features/kerala_points_terrain.csv",
+          "records": 4728,
+          "complete_terrain_records": 4712,
+          "sha256": "2BDFAB80F43431CF9173F695840869CDBED726EC7582681B2CE48B9D1F13BD8B"
+        }
+      },
+      "unavailable_features": {
+        "rainfall_mm": "not_available_for_record: no defensible per-record event date",
+        "soil_moisture_pct": "source_identified_not_downloaded: temporal matching blocked",
+        "ndvi": "source_identified_not_downloaded: temporal matching blocked",
+        "deformation_mm": "requires_scientific_review: Sentinel-1 processing not performed",
+        "velocity_mm_yr": "requires_scientific_review: Sentinel-1 processing not performed",
+        "coherence": "requires_scientific_review: acquisition-pair processing not performed"
+      }
+    },
+    "event_date_registry": {
+      "purpose": "Evidence registry for historical timing; no individual inventory record is assigned a date without a source crosswalk.",
+      "generated_at": "2026-10-09",
+      "record_level_assignments": {
+        "kodagu_2018_points": {
+          "records": 267,
+          "exact_dates": 0,
+          "bounded_intervals": 0,
+          "unknown_dates": 267
+        },
+        "kodagu_2018_polygons": {
+          "records": 217,
+          "exact_dates": 0,
+          "bounded_intervals": 0,
+          "unknown_dates": 217
+        },
+        "kerala_2018_points": {
+          "records": 4728,
+          "exact_dates": 0,
+          "bounded_intervals": 0,
+          "unknown_dates": 4728
+        }
+      },
+      "inventory_level_evidence": [
+        {
+          "inventory": "kodagu_2018",
+          "source_record_id": null,
+          "date_start": "2018-08-01",
+          "date_end": "2018-08-31",
+          "date_type": "storm_episode_month",
+          "precision": "month",
+          "confidence": "medium",
+          "review_status": "inventory_only_not_record_level",
+          "source_url": "https://github.com/Arpithaachaiah6/Landslide-inventory-for-the-2018-storm-event-of-Kodagu-in-the-Western-Ghats",
+          "supporting_references": [
+            "The repository title and README identify the inventory as the 2018 storm event of Kodagu.",
+            "The associated paper DOI is https://doi.org/10.1007/s12524-024-01953-8.",
+            "The NRSC disaster map is titled for landslides triggered by rainfall in August 2018: https://ndem.nrsc.gov.in/documents/Disaster_Document/2018/KA/kalandslide50dsc07092018/kalandslide50dsc07092018_map.pdf"
+          ],
+          "rationale": "The evidence identifies an August 2018 storm episode, but the source shapefiles contain no event date or crosswalk from each Name value to an occurrence date. Satellite and field interpretation dates are observation or inventory evidence, not necessarily onset dates."
+        },
+        {
+          "inventory": "kerala_2018_points",
+          "source_record_id": null,
+          "date_start": "2018-08-08",
+          "date_end": "2018-08-17",
+          "date_type": "peak_storm_episode",
+          "precision": "bounded_storm_period",
+          "confidence": "medium",
+          "review_status": "inventory_only_not_record_level",
+          "source_url": "https://doi.org/10.17026/DANS-X6C-Y7X2",
+          "supporting_references": [
+            "The DANS landing page identifies the dataset as the 2018 monsoon rainfall inventory and reports 4,728 mapped landslides.",
+            "Hao et al. (2020), Earth System Science Data: https://doi.org/10.5194/essd-12-2899-2020",
+            "Kerala State Disaster Management Authority / IMD report: https://sdma.kerala.gov.in/wp-content/uploads/2020/08/IMD-Monsoon-Extreme-Rainfall-2018.pdf"
+          ],
+          "rationale": "Official reporting supports a peak extreme-rainfall and disaster period in August 2018, including 8-17 August. The shapefile has no per-record event date, and the inventory methodology combines sources and image interpretation. The storm period cannot be assigned to every mapped point."
+        }
+      ],
+      "interpretation": {
+        "exact_event_dates_recovered": 0,
+        "record_intervals_recovered": 0,
+        "storm_level_episodes_documented": 2,
+        "rainfall_matching_allowed": false,
+        "reason": "No record-level date or date interval has a defensible source-to-record association."
+      }
+    }
+  },
+  "feature_coverage": {
+    "deformation_mm": {
+      "status": "unavailable_or_not_temporally_matchable",
+      "observed_in_research_outputs": false,
+      "valid_supervised_input": false,
+      "reason": "No defensible record-level event date or source measurement was available."
+    },
+    "velocity_mm_yr": {
+      "status": "unavailable_or_not_temporally_matchable",
+      "observed_in_research_outputs": false,
+      "valid_supervised_input": false,
+      "reason": "No defensible record-level event date or source measurement was available."
+    },
+    "coherence": {
+      "status": "unavailable_or_not_temporally_matchable",
+      "observed_in_research_outputs": false,
+      "valid_supervised_input": false,
+      "reason": "No defensible record-level event date or source measurement was available."
+    },
+    "rainfall_mm": {
+      "status": "unavailable_or_not_temporally_matchable",
+      "observed_in_research_outputs": false,
+      "valid_supervised_input": false,
+      "reason": "No defensible record-level event date or source measurement was available."
+    },
+    "slope_deg": {
+      "status": "extracted_and_validated",
+      "observed_in_research_outputs": true,
+      "valid_supervised_input": false,
+      "reason": "Spatial SRTM-derived terrain measurement with method and source metadata."
+    },
+    "soil_moisture_pct": {
+      "status": "unavailable_or_not_temporally_matchable",
+      "observed_in_research_outputs": false,
+      "valid_supervised_input": false,
+      "reason": "No defensible record-level event date or source measurement was available."
+    },
+    "elevation_m": {
+      "status": "extracted_and_validated",
+      "observed_in_research_outputs": true,
+      "valid_supervised_input": false,
+      "reason": "Spatial SRTM-derived terrain measurement with method and source metadata."
+    },
+    "aspect_deg": {
+      "status": "extracted_and_validated",
+      "observed_in_research_outputs": true,
+      "valid_supervised_input": false,
+      "reason": "Spatial SRTM-derived terrain measurement with method and source metadata."
+    },
+    "ndvi": {
+      "status": "unavailable_or_not_temporally_matchable",
+      "observed_in_research_outputs": false,
+      "valid_supervised_input": false,
+      "reason": "No defensible record-level event date or source measurement was available."
+    }
+  },
+  "label_readiness": {
+    "confirmed_landslide_records": 5212,
+    "verified_non_event_records": 0,
+    "unknown_or_unobserved_locations": "Not represented by these event inventories",
+    "supervised_learning_justified": false,
+    "reason": "Event inventories establish recorded presence only and do not provide verified Low-risk observations or independent labels."
+  },
+  "validation_requirements": [
+    "Acquire independently verified non-event observations with defined spatial and temporal coverage.",
+    "Obtain event IDs and dates or bounded intervals before temporal feature extraction.",
+    "Split by event, geography, and time where those identifiers exist.",
+    "Keep Kodagu points and polygons separate unless a source crosswalk verifies their relationship.",
+    "Fit all preprocessing inside training folds and reserve an untouched final evaluation set."
+  ]
+}

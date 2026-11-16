@@ -1,0 +1,170 @@
+{
+  "schema_version": "1.0",
+  "generated_at_utc": "2026-10-09T18:30:00Z",
+  "purpose": "Research planning inventory for independently supported non-event observations. This file contains no candidate observations and no invented labels.",
+  "project_status": "SAMPLING PLAN READY — OBSERVATIONS NOT YET VERIFIED",
+  "sources": [
+    {
+      "source_id": "kodagu_2018_inventory",
+      "name": "Landslide inventory for the 2018 storm event of Kodagu in the Western Ghats",
+      "publisher": "Arpithaachaiah6 repository",
+      "url": "https://github.com/Arpithaachaiah6/Landslide-inventory-for-the-2018-storm-event-of-Kodagu-in-the-Western-Ghats",
+      "geographic_coverage": "Kodagu, Karnataka",
+      "temporal_coverage": "2018 storm-event inventory; no record-level dates in acquired attributes",
+      "access_status": "acquired_and_validated",
+      "license_or_terms": "CC BY-SA 4.0 as recorded in the acquisition report",
+      "negative_label_support": "no",
+      "evidence_scope": "Recorded landslide presence only; absence from the files is not evidence of a non-event.",
+      "relevant_fields": ["Name", "X", "Y", "area"],
+      "limitations": [
+        "Point Name identifiers repeat and require source-row identity.",
+        "Point and polygon inventories have no source-backed event crosswalk.",
+        "Coverage and reporting completeness are not established."
+      ]
+    },
+    {
+      "source_id": "kerala_2018_inventory",
+      "name": "Kerala 2018 monsoon landslide inventory",
+      "publisher": "DANS Data Station / C.J. van Westen",
+      "url": "https://doi.org/10.17026/DANS-X6C-Y7X2",
+      "geographic_coverage": "Kerala, India",
+      "temporal_coverage": "2018 monsoon inventory; no record-level dates in acquired attributes",
+      "access_status": "acquired_and_validated",
+      "license_or_terms": "CC BY 4.0 as recorded in the acquisition report",
+      "negative_label_support": "no",
+      "evidence_scope": "Mapped landslide presence only; unlisted locations have unknown status.",
+      "relevant_fields": ["No", "District", "NRSC", "GSI", "POINT_X", "POINT_Y"],
+      "limitations": [
+        "No explicit stable-ground or non-landslide class.",
+        "No complete observation footprint or reporting-completeness field.",
+        "No record-level occurrence date."
+      ]
+    },
+    {
+      "source_id": "nrsc_ndem_disaster_documents",
+      "name": "NRSC/NDEM disaster documentation",
+      "publisher": "National Remote Sensing Centre / ISRO",
+      "url": "https://ndem.nrsc.gov.in/documents/Disaster_Document/2018/KA/kalandslide50dsc07092018/kalandslide50dsc07092018_map.pdf",
+      "geographic_coverage": "Karnataka disaster-document example; coverage depends on individual document",
+      "temporal_coverage": "Document-specific",
+      "access_status": "previously_accessed_for_context_only",
+      "license_or_terms": "Reuse and redistribution terms require confirmation from NRSC",
+      "negative_label_support": "not_demonstrated",
+      "evidence_scope": "Can provide mapped disaster context or incident evidence. It does not automatically document adequate search coverage for negatives.",
+      "relevant_fields": ["map_extent", "document_date", "disaster_context"],
+      "limitations": [
+        "A disaster map is not a complete non-event survey.",
+        "A negative label would require explicit coverage, resolution, observation date and review evidence."
+      ]
+    },
+    {
+      "source_id": "bhuvan_store",
+      "name": "Bhuvan data products and catalog",
+      "publisher": "NRSC / ISRO",
+      "url": "https://bhuvan-app1.nrsc.gov.in/2dresources/bhuvanstore.php",
+      "geographic_coverage": "India and product-specific footprints",
+      "temporal_coverage": "Product-specific; the accessed catalog lists product periods and resolutions",
+      "access_status": "metadata_page_accessed",
+      "license_or_terms": "Product-specific; confirm terms before download or redistribution",
+      "negative_label_support": "no",
+      "evidence_scope": "Potential imagery/DEM source for a documented review, not a ready-made negative-label dataset.",
+      "relevant_fields": ["product", "resolution", "availability_period", "coverage"],
+      "limitations": [
+        "Catalog metadata alone does not establish stable ground.",
+        "Historical image review still needs a defined footprint, date window, quality assessment and reviewer."
+      ]
+    },
+    {
+      "source_id": "landsat_archive",
+      "name": "Landsat data archive",
+      "publisher": "USGS/NASA",
+      "url": "https://science.nasa.gov/mission/landsat/data-overview/",
+      "geographic_coverage": "Global",
+      "temporal_coverage": "Multi-decadal archive; scene and sensor dependent",
+      "access_status": "official_metadata_page_accessed",
+      "license_or_terms": "USGS/NASA data-use terms apply; verify product-specific attribution",
+      "negative_label_support": "not_directly",
+      "evidence_scope": "Suitable source for human-reviewed pre/post imagery evidence over an explicitly documented area and period.",
+      "relevant_fields": ["scene_id", "acquisition_datetime", "cloud_cover", "processing_level", "geometry"],
+      "limitations": [
+        "Medium-resolution imagery can miss small or obscured failures.",
+        "No visible change is not proof of no landslide without adequate image quality and reviewer criteria.",
+        "Clouds, shadows, vegetation and revisit gaps create false-negative risk."
+      ]
+    },
+    {
+      "source_id": "copernicus_data_space",
+      "name": "Copernicus Data Space Ecosystem Sentinel collections",
+      "publisher": "European Space Agency / Copernicus",
+      "url": "https://dataspace.copernicus.eu/data-collections",
+      "geographic_coverage": "Global, subject to mission/product footprint",
+      "temporal_coverage": "Mission/product dependent; Sentinel-1 and Sentinel-2 provide date-stamped acquisitions",
+      "access_status": "official_metadata_page_accessed",
+      "license_or_terms": "Copernicus data policy and product-specific terms apply",
+      "negative_label_support": "not_directly",
+      "evidence_scope": "Potential source for a repeatable image-review protocol; not a labeled non-event collection.",
+      "relevant_fields": ["product_id", "sensing_start", "sensing_end", "cloud_or_quality_flags", "footprint"],
+      "limitations": [
+        "Sentinel-1 backscatter or raw GRD is not itself a landslide or stable-ground label.",
+        "A negative interpretation needs a documented baseline, post-event image, processing method and reviewer."
+      ]
+    },
+    {
+      "source_id": "nasa_earthdata_search",
+      "name": "NASA Earthdata Search",
+      "publisher": "NASA Earth Science Data Systems",
+      "url": "https://www.earthdata.nasa.gov/data/tools/earthdata-search",
+      "geographic_coverage": "Product-specific, commonly global",
+      "temporal_coverage": "Product-specific",
+      "access_status": "official_metadata_page_accessed",
+      "license_or_terms": "Product-specific provider terms and attribution apply",
+      "negative_label_support": "not_directly",
+      "evidence_scope": "Discovery and access route for time-stamped imagery and environmental products used in a review.",
+      "relevant_fields": ["collection_id", "granule_id", "time", "bbox", "quality_metadata"],
+      "limitations": [
+        "Search availability does not prove a location was observed cloud-free.",
+        "Products must be checked for spatial support, temporal alignment and quality flags."
+      ]
+    },
+    {
+      "source_id": "kerala_sdma",
+      "name": "Kerala State Disaster Management Authority",
+      "publisher": "Kerala SDMA",
+      "url": "https://sdma.kerala.gov.in/",
+      "geographic_coverage": "Kerala",
+      "temporal_coverage": "Report and incident dependent",
+      "access_status": "official_homepage_accessed",
+      "license_or_terms": "Confirm report-specific reuse and attribution terms",
+      "negative_label_support": "not_demonstrated",
+      "evidence_scope": "Potential source of official incident reports and response coverage. Reports are not presumed complete negative surveys.",
+      "relevant_fields": ["report_id", "incident_date", "location", "coverage_description"],
+      "limitations": [
+        "Non-reporting can reflect access, awareness or reporting bias.",
+        "A negative observation requires explicit statement of search coverage and observation period."
+      ]
+    },
+    {
+      "source_id": "field_survey_protocol",
+      "name": "Prospective field survey with documented search coverage",
+      "publisher": "To be commissioned with a qualified survey team",
+      "url": null,
+      "geographic_coverage": "Sampling frame defined before collection",
+      "temporal_coverage": "Survey date and retrospective lookback must be specified",
+      "access_status": "not_yet_conducted",
+      "license_or_terms": "Requires project-specific consent, safety, data-use and attribution terms",
+      "negative_label_support": "potentially_yes_after_review",
+      "evidence_scope": "Strongest local evidence when the survey footprint, search protocol, observation date, reviewer and uncertainty are recorded.",
+      "relevant_fields": ["survey_id", "observer", "search_coverage", "observation_timestamp", "finding", "quality_flags"],
+      "limitations": [
+        "A survey supports only its searched area and observation period.",
+        "Access, safety and observer detection limits remain possible sources of false negatives."
+      ]
+    }
+  ],
+  "current_conclusion": {
+    "verified_non_event_records_available": 0,
+    "source_with_verified_negative_labels": false,
+    "absence_from_inventory_is_negative": false,
+    "next_concrete_action": "Select a bounded Kodagu or Kerala pilot frame, acquire cloud-screened pre/post imagery or conduct a documented field survey, and have two reviewers complete the proposed review schema before any label is admitted."
+  }
+}

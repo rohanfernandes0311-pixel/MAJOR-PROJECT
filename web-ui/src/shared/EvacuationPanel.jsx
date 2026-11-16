@@ -9,7 +9,7 @@ export default function EvacuationPanel({ risk = 'SAFE', destination = '', route
 
   const critical = normalizedRisk === 'CRITICAL'
   return (
-    <section aria-labelledby="safe-route-title" className={`rounded-3xl border p-4 backdrop-blur-xl ${statusStyles[normalizedRisk]}`}>
+    <section aria-labelledby="safe-route-title" className={`rounded-md border p-4 ${statusStyles[normalizedRisk]}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-bold uppercase tracking-[0.24em]">SAFE ROUTE GUIDANCE</div>
@@ -19,7 +19,7 @@ export default function EvacuationPanel({ risk = 'SAFE', destination = '', route
         <button type="button" onClick={onReplayGuidance} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold">Play safety guidance</button>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="mt-4 rounded-md border border-white/10 bg-black/20 p-4">
         <label htmlFor="safe-route-destination" className="text-sm font-semibold">Destination coordinates</label>
         <p className="mt-1 text-xs text-white/65">Enter latitude and longitude separated by a comma. LandSense will request a route that reduces exposure to configured risk zones.</p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">

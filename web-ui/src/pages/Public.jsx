@@ -8,7 +8,7 @@ import {
   persistOfflineEmergencyAlert
 } from '../shared/offlineEmergencyAlertStore'
 import { apiFetch, getStoredAuth } from '../auth/authClient'
-import { AlertNotificationManager } from '../services/alertNotificationManager'
+import { AlertNotificationManager, citizenLiveAlerts } from '../services/alertNotificationManager'
 import { INCIDENT_DEMO_EVENT, formatIncidentDate, impactLines, readDemoAlert } from '../services/incidentDemo'
 import { citizenRiskCopy, deriveCitizenGeofenceState, normalizeRisk } from '../services/citizenGeofence'
 import { createCitizenWeatherController, weatherFields, WEATHER_UNAVAILABLE } from '../services/citizenWeather'
@@ -16,6 +16,7 @@ import { createCitizenEnvironmentController } from '../services/citizenEnvironme
 import SoilMoistureCard from '../shared/SoilMoistureCard'
 import { createCitizenPrecipitationController } from '../services/citizenPrecipitation'
 import PrecipitationCard from '../shared/PrecipitationCard'
+import LandSenseLayout from '../components/LandSenseLayout'
 
 const STORAGE = {
   uid: 'landsense_uid',
@@ -84,7 +85,7 @@ function friendlyLocation(raw) {
 
 function WeatherCard({ label, value }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+    <div className="rounded-md border border-[#d8e0dd] bg-[#f8faf8] px-3 py-2.5">
       <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">{label}</div>
       <div className="mt-1 text-sm font-semibold text-white">{value}</div>
     </div>
@@ -230,7 +231,7 @@ export default function Public() {
     alertRefreshInFlightRef.current = true
     try {
       const response = await apiFetch('/alerts/my', {}, token)
-      const alerts = Array.isArray(response?.alerts) ? response.alerts : []
+      const alerts = citizenLiveAlerts(response?.alerts)
       setTargetedAlerts(alerts)
       setAlertInboxState('ready')
 
@@ -758,19 +759,18 @@ export default function Public() {
     sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const navigation = [
+    { id: 'dashboard', label: 'Dashboard', onClick: () => scrollToSection(dashboardRef), active: true },
+    { id: 'map', label: 'Map', onClick: () => scrollToSection(mapRef) },
+    { id: 'alerts', label: 'Alerts', onClick: () => scrollToSection(alertsRef) },
+    { id: 'safety', label: 'Safety', onClick: () => scrollToSection(safetyRef) }
+  ]
+
   return (
+    <LandSenseLayout items={navigation}>
     <div className="citizen-shell px-3 py-3 sm:px-5 lg:px-6">
       <div className="mx-auto max-w-[1600px]">
         <main className="space-y-4">
-          <header className="citizen-nav mx-auto flex max-w-screen-xl items-center gap-6 border-b border-[#dfe5df] bg-white px-4 py-3">
-            <button type="button" onClick={() => scrollToSection(dashboardRef)} className="inline-flex shrink-0 items-center gap-2 text-base font-bold tracking-tight text-[#174832]"><img src="/icons/landsense-logo.png" alt="" className="h-7 w-7 rounded-lg object-contain" /><span>LandSense</span></button>
-            <nav aria-label="Citizen dashboard" className="flex items-center gap-1 overflow-x-auto text-sm">
-              <button type="button" onClick={() => scrollToSection(dashboardRef)} className="citizen-nav-link">Dashboard</button>
-              <button type="button" onClick={() => scrollToSection(mapRef)} className="citizen-nav-link">Map</button>
-              <button type="button" onClick={() => scrollToSection(alertsRef)} className="citizen-nav-link">Alerts</button>
-              <button type="button" onClick={() => scrollToSection(safetyRef)} className="citizen-nav-link">Safety</button>
-            </nav>
-          </header>
           {demoAlert ? <div className="mx-auto max-w-screen-xl"><div className="rounded-2xl border border-red-300/40 bg-red-500/15 px-4 py-3 text-sm text-red-50"><div className="text-xs font-bold tracking-[0.24em]">{demoAlert.offline_demo ? '🚨 LANDSLIDE EMERGENCY' : 'LANDSENSE DEMO ALERT'}</div><div className="mt-1 text-lg font-bold">{demoAlert.title}</div><div>{demoAlert.location_name}, {demoAlert.district} · {formatIncidentDate(demoAlert.date)}</div><div className="mt-2 font-bold text-amber-200">{demoAlert.offline_demo ? '🧪 OFFLINE DEMO · NO REAL MESSAGE WAS SENT' : 'SIMULATION — NOT A LIVE ALERT'}</div></div></div> : null}
 
           {offline ? (
@@ -826,7 +826,7 @@ export default function Public() {
                           <button
                             type="button"
                             onClick={() => scrollToSection(routeRef)}
-                            className={`rounded-lg px-3 py-2 text-xs font-bold text-white ${status.risk === 'CRITICAL RISK' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-orange-700 hover:bg-orange-800'}`}
+                            className={`citizen-emergency-route-action rounded-lg px-3 py-2 text-xs font-bold text-white ${status.risk === 'CRITICAL RISK' ? 'bg-rose-700 hover:bg-rose-800' : 'bg-orange-700 hover:bg-orange-800'}`}
                           >
                             View safe route
                           </button>
@@ -852,7 +852,7 @@ export default function Public() {
             </div>
           </div>
 
-          <div className="mx-auto max-w-screen-xl p-4 md:p-6">
+          <div className="citizen-dashboard-container mx-auto max-w-screen-xl">
             <div className="citizen-dashboard-grid">
             <header className="citizen-location">
               <div className="border-b border-[#dfe5df] bg-white px-4 py-4">
@@ -1011,5 +1011,6 @@ export default function Public() {
         </main>
       </div>
     </div>
+    </LandSenseLayout>
   )
 }

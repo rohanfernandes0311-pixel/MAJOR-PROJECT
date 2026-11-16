@@ -1,0 +1,67 @@
+{
+  "purpose": "Evidence registry for historical timing; no individual inventory record is assigned a date without a source crosswalk.",
+  "generated_at": "2026-10-09",
+  "record_level_assignments": {
+    "kodagu_2018_points": {
+      "records": 267,
+      "exact_dates": 0,
+      "bounded_intervals": 0,
+      "unknown_dates": 267
+    },
+    "kodagu_2018_polygons": {
+      "records": 217,
+      "exact_dates": 0,
+      "bounded_intervals": 0,
+      "unknown_dates": 217
+    },
+    "kerala_2018_points": {
+      "records": 4728,
+      "exact_dates": 0,
+      "bounded_intervals": 0,
+      "unknown_dates": 4728
+    }
+  },
+  "inventory_level_evidence": [
+    {
+      "inventory": "kodagu_2018",
+      "source_record_id": null,
+      "date_start": "2018-08-01",
+      "date_end": "2018-08-31",
+      "date_type": "storm_episode_month",
+      "precision": "month",
+      "confidence": "medium",
+      "review_status": "inventory_only_not_record_level",
+      "source_url": "https://github.com/Arpithaachaiah6/Landslide-inventory-for-the-2018-storm-event-of-Kodagu-in-the-Western-Ghats",
+      "supporting_references": [
+        "The repository title and README identify the inventory as the 2018 storm event of Kodagu.",
+        "The associated paper DOI is https://doi.org/10.1007/s12524-024-01953-8.",
+        "The NRSC disaster map is titled for landslides triggered by rainfall in August 2018: https://ndem.nrsc.gov.in/documents/Disaster_Document/2018/KA/kalandslide50dsc07092018/kalandslide50dsc07092018_map.pdf"
+      ],
+      "rationale": "The evidence identifies an August 2018 storm episode, but the source shapefiles contain no event date or crosswalk from each Name value to an occurrence date. Satellite and field interpretation dates are observation or inventory evidence, not necessarily onset dates."
+    },
+    {
+      "inventory": "kerala_2018_points",
+      "source_record_id": null,
+      "date_start": "2018-08-08",
+      "date_end": "2018-08-17",
+      "date_type": "peak_storm_episode",
+      "precision": "bounded_storm_period",
+      "confidence": "medium",
+      "review_status": "inventory_only_not_record_level",
+      "source_url": "https://doi.org/10.17026/DANS-X6C-Y7X2",
+      "supporting_references": [
+        "The DANS landing page identifies the dataset as the 2018 monsoon rainfall inventory and reports 4,728 mapped landslides.",
+        "Hao et al. (2020), Earth System Science Data: https://doi.org/10.5194/essd-12-2899-2020",
+        "Kerala State Disaster Management Authority / IMD report: https://sdma.kerala.gov.in/wp-content/uploads/2020/08/IMD-Monsoon-Extreme-Rainfall-2018.pdf"
+      ],
+      "rationale": "Official reporting supports a peak extreme-rainfall and disaster period in August 2018, including 8-17 August. The shapefile has no per-record event date, and the inventory methodology combines sources and image interpretation. The storm period cannot be assigned to every mapped point."
+    }
+  ],
+  "interpretation": {
+    "exact_event_dates_recovered": 0,
+    "record_intervals_recovered": 0,
+    "storm_level_episodes_documented": 2,
+    "rainfall_matching_allowed": false,
+    "reason": "No record-level date or date interval has a defensible source-to-record association."
+  }
+}

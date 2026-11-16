@@ -95,6 +95,10 @@ export function clearAuthSession() {
   localStorage.removeItem(STORAGE.token)
   localStorage.removeItem(STORAGE.refresh)
   localStorage.removeItem(STORAGE.profile)
+  // GPS-bearing emergency snapshots and drill state belong to this session.
+  localStorage.removeItem('landsense_offline_emergency_alert_v1')
+  localStorage.removeItem('landsense_incident_demo_alert')
+  localStorage.removeItem('landsense_observed_targeted_alerts')
 }
 
 export function savePendingPhone(phoneNumber, maskedPhone, returnTo = '/', loginIntent = 'citizen') {

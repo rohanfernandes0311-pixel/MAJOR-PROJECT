@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "generated_at_utc": "2026-10-09T18:45:00Z",
+  "purpose": "Checksummed manifest for research-only Kodagu imagery downloads.",
+  "download_directory": "data/research/kodagu_imagery_downloads/",
+  "files": [
+    {
+      "local_file": "data/research/kodagu_imagery_downloads/S1B_IW_GRDH_1SDV_20180815T130642_thumbnail.png",
+      "local_scene_key": "copernicus_s1_20180815_130642_iw_grdh",
+      "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+      "asset_type": "thumbnail",
+      "source_url": "https://datahub.creodias.eu/odata/v1/Assets(20e9305a-2fba-4757-b9d7-63e6cfffc5ac)/$value",
+      "retrieved_at_utc": "2026-10-09T18:45:00Z",
+      "bytes": 90788,
+      "sha256": "3FA1071E59111C69A41F041DC19BEB2CF80C2B875FF32167583F201A54B628FC",
+      "file_format": "PNG",
+      "dimensions_px": {
+        "width": 251,
+        "height": 200
+      },
+      "coverage_status": "catalog_footprint_intersects_pilot",
+      "quality_screening": {
+        "file_integrity": "valid_png",
+        "pixel_level_pilot_quality": "not_assessed",
+        "scientific_product": false,
+        "reviewable_for_non_event": false
+      },
+      "license_access_notes": "Public thumbnail asset retrieved from the catalog-linked browse endpoint. This quicklook is not a substitute for the authenticated Sentinel-1 GRD product."
+    }
+  ],
+  "attempts": [
+    {
+      "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+      "source_url": "https://download.dataspace.copernicus.eu/odata/v1/Products(1679bab8-605a-493e-9ca2-396a4b9349e7)/$value",
+      "retrieval_method": "Unauthenticated HTTPS request",
+      "status": "blocked",
+      "error": "HTTP 405 Method Not Allowed",
+      "retained": false
+    },
+    {
+      "product_id": "LC08_L2SP_145051_20180808_20200831_02_T2_SR",
+      "source_url": "https://landsatlook.usgs.gov/data/collection02/level-2/standard/oli-tirs/2018/145/051/LC08_L2SP_145051_20180808_20200831_02_T2/LC08_L2SP_145051_20180808_20200831_02_T2_thumb_large.jpeg",
+      "retrieval_method": "Unauthenticated HTTPS request",
+      "status": "blocked",
+      "error": "Response was EROS Registration System login HTML, not an image; response was deleted and is not represented as imagery.",
+      "retained": false
+    },
+    {
+      "product_id": "LC08_L2SP_145051_20180808_20200831_02_T2_SR",
+      "source_url": "https://landsatlook.usgs.gov/data/collection02/level-2/standard/oli-tirs/2018/145/051/LC08_L2SP_145051_20180808_20200831_02_T2/LC08_L2SP_145051_20180808_20200831_02_T2_thumb_small.jpeg",
+      "retrieval_method": "Unauthenticated HTTPS request",
+      "status": "blocked",
+      "error": "Response was HTML rather than JPEG; response was deleted and is not retained.",
+      "retained": false
+    },
+    {
+      "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+      "source_url": "https://datahub.creodias.eu/odata/v1/Assets(20e9305a-2fba-4757-b9d7-63e6cfffc5ac)/$value",
+      "retrieval_method": "Unauthenticated HTTPS request to catalog-linked thumbnail asset",
+      "status": "downloaded_browse_asset",
+      "error": null,
+      "retained": true
+    },
+    {
+      "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+      "source_url": "https://download.dataspace.copernicus.eu/odata/v1/Products(1679bab8-605a-493e-9ca2-396a4b9349e7)/$value",
+      "retrieval_method": "Local authentication preflight; no download attempted",
+      "status": "blocked_authentication_unavailable",
+      "error": "No Copernicus Data Space credentials, bearer token, or CDSE OAuth client configuration was present in the local environment. No secret values were read or logged.",
+      "retained": false
+    }
+  ],
+  "integrity_statement": "One catalog-linked Sentinel-1 thumbnail PNG is retained with a checksum. No full Sentinel-1, Sentinel-2, Landsat or SLC scientific product bytes are retained; the browse asset is not suitable for pixel-level pilot quality screening or non-event labeling. Full-product retrieval is blocked pending authorized Copernicus authentication."
+}

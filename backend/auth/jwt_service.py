@@ -34,9 +34,9 @@ def normalize_role(role: str | None) -> str:
     return "Admin" if value == "admin" else "Citizen"
 
 
-def issue_auth_tokens(*, subject: str, phone_number: str, device_hash: str, session_id: str, role: str | None = None) -> dict[str, str | int]:
+def issue_auth_tokens(*, subject: str, phone_number: str, device_hash: str, session_id: str, role: str | None = None, access_jti: str | None = None) -> dict[str, str | int]:
     now = utc_now()
-    access_jti = new_jti()
+    access_jti = access_jti or new_jti()
     refresh_jti = new_jti()
     role = normalize_role(role)
 

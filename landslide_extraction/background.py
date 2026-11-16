@@ -29,5 +29,5 @@ def run_extraction_job(job_id: str, source_path: str, source_name: str, table_hi
             row_count=len(rows),
             inspection=inspection,
         )
-    except Exception as exc:  # pragma: no cover - safety net for background execution
-        job_registry.update(job_id, status="failed", error=str(exc))
+    except Exception:  # pragma: no cover - safety net for background execution
+        job_registry.update(job_id, status="failed", error="PDF extraction failed")

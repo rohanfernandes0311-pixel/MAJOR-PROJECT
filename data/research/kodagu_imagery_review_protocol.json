@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Independent human-review protocol for Kodagu historical imagery. This protocol does not assign labels automatically.",
+  "pilot": {
+    "boundary_crs": "EPSG:4326",
+    "boundary_bbox": [75.461678, 12.385906, 75.832724, 12.690308],
+    "boundary_rationale": "Exact validated bounds of the Kodagu polygon inventory, used as a bounded pilot envelope without inventing a broader study area.",
+    "event_context": "August 2018 storm episode at inventory level only; no individual Kodagu record has a defensible occurrence date.",
+    "target_review_window": {
+      "start_utc": "2018-07-01T00:00:00Z",
+      "end_utc": "2018-11-01T00:00:00Z",
+      "interpretation": "Search window for pre/post imagery candidates, not an event-date assignment."
+    }
+  },
+  "scene_pair_rules": {
+    "pre_event_scene": "Acquire the latest interpretable scene before the documented storm episode or review interval, with acquisition date and quality metadata. Do not call it pre-event for a record without a defensible event interval.",
+    "post_event_scene": "Acquire an interpretable scene after the review interval. A post-event scene establishes visibility at that date only.",
+    "pair_requirement": "Use at least one interpretable pre-period and one interpretable post-period scene for a candidate. Record all scene IDs and acquisition timestamps.",
+    "temporal_uncertainty": "If the storm-to-scene relationship is not defensible for the candidate, set temporal_role to temporally_uncertain and do not admit a negative label."
+  },
+  "review_steps": [
+    "Confirm the candidate coordinate, source inventory, source record ID, source file and source row/feature index. Use a composite local key because source IDs repeat.",
+    "Check that the candidate is inside the pilot boundary and record coordinate uncertainty and image geolocation metadata.",
+    "Inspect scene footprint intersection, pixel-level cloud and shadow masks, haze, vegetation, illumination, terrain shadow and seasonal differences.",
+    "Compare pre- and post-period imagery at the available resolution. Record whether a landslide scar, debris, altered drainage, bare-soil patch or other disturbance is visible.",
+    "Distinguish landslide evidence from road construction, agriculture, forestry, fire, cloud/shadow, seasonal vegetation and registration artifacts.",
+    "Check overlap with Kodagu point and polygon inventories. Overlap or uncertain proximity is not a negative; retain requires_review until the source relationship is understood.",
+    "Record evidence references, screenshots or derived products with checksums and the exact processing steps.",
+    "Have a second qualified reviewer independently repeat the assessment for ambiguous cases and for every proposed negative where feasible.",
+    "Adjudicate disagreements and retain both reviewer decisions and the adjudication rationale."
+  ],
+  "decision_rules": {
+    "confirmed_landslide": "Use only when independent evidence supports a landslide at the candidate location for the stated observation context.",
+    "verified_non_event_for_observed_period": "Use only when coverage_quality is adequate, the location was observable in interpretable imagery or field evidence for the complete stated period, no landslide evidence is found under the written criteria, and the review decision is accepted.",
+    "unknown_or_unobserved": "Use when the scene is missing, cloud/shadow/vegetation obscures the location, timing is not defensible, coverage is partial, or the reviewer cannot interpret the location.",
+    "requires_review": "Use for source overlap, disagreement, ambiguous change, positional uncertainty, or any case needing adjudication.",
+    "prohibition": "Never label a location negative because it is outside an inventory point/polygon, has low slope/elevation, lacks an incident report, or has a low LandSense model score."
+  },
+  "quality_and_false_negative_controls": {
+    "optical": [
+      "Use pixel-level cloud and cloud-shadow masks rather than scene-average cloud percentage alone.",
+      "Record vegetation and terrain-shadow limitations; a visually unchanged pixel is not proof of no failure.",
+      "Treat 10 m Sentinel-2 and 30 m Landsat as scale-limited observations; small or covered failures may be missed."
+    ],
+    "sar": [
+      "Do not treat Sentinel-1 GRD as deformation, coherence or a negative label.",
+      "Any change-detection or InSAR product must record orbit, polarization, acquisition pair, processing software/version, reference frame and quality thresholds.",
+      "Layover, shadow, speckle and geometric effects must be assessed in steep terrain."
+    ],
+    "all_sources": [
+      "Record geolocation uncertainty, spatial support and whether the candidate is represented by a point or polygon.",
+      "Future imagery cannot prove stability during an earlier unobserved interval.",
+      "High or unknown false-negative risk keeps the status unknown_or_unobserved or requires_review."
+    ]
+  },
+  "review_record_requirements": {
+    "reviewer_qualifications": "Record relevant remote-sensing, geomorphology or field-survey experience; do not infer qualification from model output.",
+    "required_fields": [
+      "observation_id",
+      "local_record_key",
+      "source_inventory",
+      "source_record_id",
+      "source_file",
+      "source_row_or_feature_index",
+      "scene_ids",
+      "scene_acquisition_timestamps_utc",
+      "review_timestamp_utc",
+      "reviewer_id",
+      "reviewer_qualification",
+      "status",
+      "coverage_quality",
+      "cloud_shadow_vegetation_notes",
+      "spatial_resolution_and_geolocation_notes",
+      "evidence_reference",
+      "confidence",
+      "false_negative_risk",
+      "decision_rationale"
+    ],
+    "confidence_rule": "Confidence describes the evidence review, not model confidence. It must be justified in text and cannot override inadequate coverage."
+  },
+  "leakage_controls": [
+    "Do not use LandSense predictions, risk scores or synthetic labels for candidate selection or adjudication.",
+    "Do not use terrain measurements as occurrence evidence.",
+    "Do not use future imagery to backfill an exact event date.",
+    "Keep Kodagu point and polygon inventories separate unless an authoritative crosswalk is obtained.",
+    "Keep all unresolved candidates out of supervised training and evaluation."
+  ],
+  "current_readiness": {
+    "catalog_metadata_candidates_available": true,
+    "imagery_bytes_downloaded": false,
+    "human_review_ready": false,
+    "reason": "Scene IDs and dates were retrieved, but product download, pilot-level quality masking, scene pairing and qualified human review remain outstanding.",
+    "verified_non_event_observations": 0
+  }
+}

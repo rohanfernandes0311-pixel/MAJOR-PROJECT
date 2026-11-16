@@ -24,7 +24,7 @@
 .simulation-identity { display: grid; padding-right: 220px; font-size: 12px; }
 .simulation-identity > span { color: var(--sim-muted); }
 .simulation-intro { margin: 16px 0 20px; font-size: 13px; color: var(--sim-muted); }
-.simulation-workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: start; gap: 20px; }
+.simulation-workspace { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: stretch; gap: 20px; }
 .simulation-panel { min-width: 0; padding: 20px; border: 1px solid var(--sim-border); border-radius: 6px; background: #fff; box-shadow: 0 1px 2px #17201d05; }
 .simulation-panel h2 { font-size: 14px; font-weight: 650; letter-spacing: .01em; }
 .simulation-panel[aria-label="Geofencing analysis"],
@@ -51,6 +51,11 @@
 .simulation-risk { font-size: 12px; font-weight: 600; color: #b73535; }
 .simulation-map-frame { height: 560px; margin-top: 14px; overflow: hidden; border: 1px solid var(--sim-border); border-radius: 4px; background: #edf1ef; }
 .simulation-map-frame > div { border-radius: 0 !important; }
+@media (min-width: 1024px) {
+  .simulation-panel[aria-label="Simulation map"] { display: flex; flex-direction: column; }
+  .simulation-map-frame { position: relative; flex: 1; height: auto; min-height: 560px; }
+  .simulation-map-frame > div { position: absolute; inset: 0; }
+}
 .simulation-map-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 14px; font-size: 11px; }
 .simulation-danger { color: #b73535; }
 .simulation-safe { color: var(--sim-green); }

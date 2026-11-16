@@ -1,0 +1,540 @@
+{
+  "schema_version": "1.0",
+  "generated_at_utc": "2026-10-09T18:35:44Z",
+  "purpose": "Observed official-catalog scene candidates for a Kodagu historical-imagery pilot. No scene has been human-reviewed and no non-event label is created.",
+  "pilot": {
+    "boundary_crs": "EPSG:4326",
+    "boundary_type": "axis-aligned bounding box",
+    "west": 75.461678,
+    "south": 12.385906,
+    "east": 75.832724,
+    "north": 12.690308,
+    "boundary_source": "Validated Kodagu 2018 polygon inventory bounds in SOUTH_INDIAN_DATA_ACQUISITION_REPORT.md",
+    "event_context": "Kodagu 2018 storm-event inventory; no record-level onset dates were recovered",
+    "review_window": {
+      "start_utc": "2018-07-01T00:00:00Z",
+      "end_utc_exclusive": "2018-11-01T00:00:00Z",
+      "meaning": "Broad candidate-search window around the documented August 2018 storm episode; imagery dates are not event dates."
+    }
+  },
+  "historical_search": {
+    "july_august_window_utc": {
+      "start": "2018-07-01T00:00:00Z",
+      "end_exclusive": "2018-09-01T00:00:00Z"
+    },
+    "observed_catalog_counts": {
+      "sentinel_2_l2a": {
+        "july": 14,
+        "august": 12,
+        "total": 26
+      },
+      "sentinel_1_grd": {
+        "july": 4,
+        "august": 6,
+        "total": 10
+      },
+      "sentinel_1_slc": {
+        "july": 4,
+        "august": 1,
+        "total_observed": 5
+      },
+      "landsat_c2l2_sr": {
+        "july": 8,
+        "august": 6,
+        "total": 14
+      },
+      "total_items_observed": 55
+    },
+    "query_limitations": [
+      {
+        "catalog": "Copernicus Data Space STAC",
+        "collection": "sentinel-1-slc",
+        "window": "2018-08-01T00:00:00Z/2018-09-01T00:00:00Z",
+        "status": "blocked_by_catalog_rate_limit",
+        "error": "HTTP 429 WAF rate limit exceeded",
+        "items_recorded": 0
+      }
+    ],
+    "download_attempts": [
+      {
+        "catalog": "Copernicus Data Space",
+        "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+        "status": "blocked",
+        "error": "Unauthenticated product request returned HTTP 405 Method Not Allowed",
+        "bytes_retained": false
+      },
+      {
+        "catalog": "USGS LandsatLook",
+        "product_id": "LC08_L2SP_145051_20180808_20200831_02_T2_SR",
+        "status": "blocked",
+        "error": "Asset request returned the EROS Registration System login HTML instead of image bytes",
+        "bytes_retained": false
+      },
+      {
+        "catalog": "USGS LandsatLook",
+        "product_id": "LC08_L2SP_145051_20180808_20200831_02_T2_SR",
+        "status": "blocked",
+        "error": "Small browse asset request also returned HTML rather than JPEG bytes; response was deleted and is not represented as imagery.",
+        "bytes_retained": false
+      },
+      {
+        "catalog": "Copernicus Data Space",
+        "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+        "status": "browse_asset_downloaded",
+        "asset_type": "thumbnail",
+        "source_url": "https://datahub.creodias.eu/odata/v1/Assets(20e9305a-2fba-4757-b9d7-63e6cfffc5ac)/$value",
+        "error": null,
+        "bytes_retained": true
+      },
+      {
+        "catalog": "Copernicus Data Space",
+        "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+        "status": "blocked_authentication_unavailable",
+        "error": "Local preflight found no Copernicus Data Space credentials or bearer token configuration; no full-product request was attempted.",
+        "bytes_retained": false
+      }
+    ]
+  },
+  "catalog_queries": [
+    {
+      "catalog": "Copernicus Data Space STAC",
+      "catalog_url": "https://stac.dataspace.copernicus.eu/v1/",
+      "query_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-2-l2a/items?bbox=75.461678,12.385906,75.832724,12.690308&datetime=2018-07-01T00:00:00Z/2018-11-01T00:00:00Z&limit=5",
+      "collection": "sentinel-2-l2a",
+      "retrieval_method": "Unauthenticated HTTPS STAC GET",
+      "result_observed": true,
+      "result_limit": 5
+    },
+    {
+      "catalog": "Copernicus Data Space STAC",
+      "catalog_url": "https://stac.dataspace.copernicus.eu/v1/",
+      "query_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-grd/items?bbox=75.461678,12.385906,75.832724,12.690308&datetime=2018-07-01T00:00:00Z/2018-11-01T00:00:00Z&limit=5",
+      "collection": "sentinel-1-grd",
+      "retrieval_method": "Unauthenticated HTTPS STAC GET",
+      "result_observed": true,
+      "result_limit": 5
+    },
+    {
+      "catalog": "USGS LandsatLook STAC",
+      "catalog_url": "https://landsatlook.usgs.gov/stac-server/",
+      "query_url": "https://landsatlook.usgs.gov/stac-server/search?collections=landsat-c2l2-sr&bbox=75.461678,12.385906,75.832724,12.690308&datetime=2018-07-01T00:00:00Z/2018-11-01T00:00:00Z&limit=5",
+      "collection": "landsat-c2l2-sr",
+      "retrieval_method": "Unauthenticated HTTPS STAC GET",
+      "result_observed": true,
+      "result_limit": 5
+    }
+  ],
+  "scenes": [
+    {
+      "local_scene_key": "copernicus_s2_20181024_051859_t43peq",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-2-l2a",
+      "product_id": "S2B_MSIL2A_20181024T051859_N0500_R062_T43PEQ_20230622T154852",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20181024T051859_N0500_R062_T43PEQ_20230622T154852",
+      "acquisition_timestamp_utc": "2018-10-24T05:18:59.024000Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.99981513874827, 12.573660613051583, 76.0146471349574, 13.56845127858601]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "cloud_cover_percent": 0.28,
+        "cloud_metadata_source": "eo:cloud_cover"
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Catalog metadata was accessible. Product access and licensing must be checked before download or redistribution."
+      },
+      "validation_status": "catalog_metadata_observed_not_human_reviewed",
+      "missing_fields": ["scene_level_cloud_mask_for_the_pilot_bbox", "reviewer_assessment", "pre_event_pair"],
+      "reviewer_notes": "Product footprint intersects the pilot bbox. October acquisition is later than the documented August storm episode and cannot establish onset or absence by itself."
+    },
+    {
+      "local_scene_key": "copernicus_s2_20181024_051859_t43pep",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-2-l2a",
+      "product_id": "S2B_MSIL2A_20181024T051859_N0500_R062_T43PEP_20230622T154852",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20181024T051859_N0500_R062_T43PEP_20230622T154852",
+      "acquisition_timestamp_utc": "2018-10-24T05:18:59.024000Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.99981513874827, 12.573660613051583, 76.0146471349574, 13.56845127858601]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "cloud_cover_percent": 1.98,
+        "cloud_metadata_source": "eo:cloud_cover"
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Catalog metadata was accessible. Product access and licensing must be checked before download or redistribution."
+      },
+      "validation_status": "catalog_metadata_observed_not_human_reviewed",
+      "missing_fields": ["scene_level_cloud_mask_for_the_pilot_bbox", "reviewer_assessment", "pre_event_pair"],
+      "reviewer_notes": "Product footprint intersects the pilot bbox. October acquisition is later than the documented August storm episode and cannot establish onset or absence by itself."
+    },
+    {
+      "local_scene_key": "copernicus_s1_20181026_130645_iw_grdh",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-1-grd",
+      "product_id": "S1B_IW_GRDH_1SDV_20181026T130645_20181026T130714_013324_018A2A_3A13_COG",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-grd/items/S1B_IW_GRDH_1SDV_20181026T130645_20181026T130714_013324_018A2A_3A13_COG",
+      "acquisition_timestamp_utc": "2018-10-26T13:06:45.082153Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.642601, 12.506961, 77.268883, 14.697894]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "relative_orbit": 173,
+        "instrument_mode": "IW",
+        "polarization": "VV/VH",
+        "cloud_cover_percent": null
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Catalog metadata was accessible. GRD product access and processing terms must be checked before download."
+      },
+      "validation_status": "catalog_metadata_observed_not_human_reviewed",
+      "missing_fields": ["pilot_subset_quality_metrics", "pre_event_pair", "reviewer_assessment"],
+      "reviewer_notes": "GRD is an observation product, not a deformation or stable-ground label. Interferometric or change-detection processing would require additional scenes and scientific review."
+    },
+    {
+      "local_scene_key": "copernicus_s1_20181025_004815_iw_grdh",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-1-grd",
+      "product_id": "S1A_IW_GRDH_1SDV_20181025T004815_20181025T004840_024285_02A86F_45C1_COG",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-grd/items/S1A_IW_GRDH_1SDV_20181025T004815_20181025T004840_024285_02A86F_45C1_COG",
+      "acquisition_timestamp_utc": "2018-10-25T00:48:15.205537Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.642601, 12.506961, 77.268883, 14.697894]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "relative_orbit": 63,
+        "instrument_mode": "IW",
+        "polarization": "VV/VH",
+        "cloud_cover_percent": null
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Catalog metadata was accessible. GRD product access and processing terms must be checked before download."
+      },
+      "validation_status": "catalog_metadata_observed_not_human_reviewed",
+      "missing_fields": ["pilot_subset_quality_metrics", "pre_event_pair", "reviewer_assessment"],
+      "reviewer_notes": "GRD is an observation product, not a deformation or stable-ground label. Interferometric or change-detection processing would require additional scenes and scientific review."
+    },
+    {
+      "local_scene_key": "usgs_landsat8_20181027_path145_row052",
+      "catalog": "USGS LandsatLook STAC",
+      "collection": "landsat-c2l2-sr",
+      "product_id": "LC08_L2SP_145052_20181027_20200830_02_T1_SR",
+      "catalog_item_url": "https://landsatlook.usgs.gov/stac-server/collections/landsat-c2l2-sr/items/LC08_L2SP_145052_20181027_20200830_02_T1_SR",
+      "acquisition_timestamp_utc": "2018-10-27T05:17:20.964088Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.3808319916915, 10.519231176693099, 76.42361459961349, 12.608822623587542]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 30,
+      "quality": {
+        "cloud_cover_percent": 1.42,
+        "cloud_metadata_source": "eo:cloud_cover"
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "USGS STAC metadata was accessible. Landsat data are generally openly accessible, but product-specific terms and download endpoints must be checked."
+      },
+      "validation_status": "catalog_metadata_observed_not_human_reviewed",
+      "missing_fields": ["scene_level_cloud_mask_for_the_pilot_bbox", "pre_event_pair", "reviewer_assessment"],
+      "reviewer_notes": "Footprint intersects the pilot bbox. October acquisition is post-storm-context imagery and cannot prove a location was stable during an earlier unobserved interval."
+    },
+    {
+      "local_scene_key": "usgs_landsat7_20181019_path145_row052",
+      "catalog": "USGS LandsatLook STAC",
+      "collection": "landsat-c2l2-sr",
+      "product_id": "LE07_L2SP_145052_20181019_20200828_02_T1_SR",
+      "catalog_item_url": "https://landsatlook.usgs.gov/stac-server/collections/landsat-c2l2-sr/items/LE07_L2SP_145052_20181019_20200828_02_T1_SR",
+      "acquisition_timestamp_utc": "2018-10-19T05:14:33.259937Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.3808319916915, 10.519231176693099, 76.42361459961349, 12.608822623587542]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 30,
+      "quality": {
+        "cloud_cover_percent": 55.0,
+        "cloud_metadata_source": "eo:cloud_cover"
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "USGS STAC metadata was accessible. Landsat data are generally openly accessible, but product-specific terms and download endpoints must be checked."
+      },
+      "validation_status": "catalog_metadata_observed_not_human_reviewed",
+      "missing_fields": ["scene_level_cloud_mask_for_the_pilot_bbox", "pre_event_pair", "reviewer_assessment"],
+      "reviewer_notes": "High scene-level cloud percentage makes this a weak review candidate until the pilot footprint is checked with a pixel-level mask."
+    },
+    {
+      "local_scene_key": "copernicus_s2_20180825_051639_t43peq",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-2-l2a",
+      "product_id": "S2B_MSIL2A_20180825T051639_N0500_R062_T43PEQ_20230712T033506",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20180825T051639_N0500_R062_T43PEQ_20230712T033506",
+      "acquisition_timestamp_utc": "2018-08-25T05:16:39.024000Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.99981513874827, 12.573660613051583, 76.0146471349574, 13.56845127858601]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "cloud_cover_percent": 83.17,
+        "cloud_metadata_source": "eo:cloud_cover"
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Product asset was exposed in the catalog, but an unauthenticated product download was not completed."
+      },
+      "validation_status": "metadata_only_high_cloud",
+      "missing_fields": ["pilot_level_cloud_shadow_mask", "pre_event_pair", "reviewer_assessment"],
+      "reviewer_notes": "Observed during the August search. High scene-level cloud cover makes this unsuitable for a negative review without pixel-level screening."
+    },
+    {
+      "local_scene_key": "copernicus_s2_20180825_051639_t43pep",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-2-l2a",
+      "product_id": "S2B_MSIL2A_20180825T051639_N0500_R062_T43PEP_20230712T033506",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-2-l2a/items/S2B_MSIL2A_20180825T051639_N0500_R062_T43PEP_20230712T033506",
+      "acquisition_timestamp_utc": "2018-08-25T05:16:39.024000Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.99981513874827, 12.573660613051583, 76.0146471349574, 13.56845127858601]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "cloud_cover_percent": 90.15,
+        "cloud_metadata_source": "eo:cloud_cover"
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Product asset was exposed in the catalog, but an unauthenticated product download was not completed."
+      },
+      "validation_status": "metadata_only_high_cloud",
+      "missing_fields": ["pilot_level_cloud_shadow_mask", "pre_event_pair", "reviewer_assessment"],
+      "reviewer_notes": "Observed during the August search. Very high scene-level cloud cover makes this unsuitable for a negative review without pixel-level screening."
+    },
+    {
+      "local_scene_key": "copernicus_s1_20180815_130642_iw_grdh",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-1-grd",
+      "product_id": "S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-grd/items/S1B_IW_GRDH_1SDV_20180815T130642_20180815T130711_012274_0169DC_C6B4_COG",
+      "acquisition_timestamp_utc": "2018-08-15T13:06:42.904818Z",
+      "temporal_role": "storm_episode_observation_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.642601, 12.506961, 77.268883, 14.697894]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "relative_orbit": 173,
+        "instrument_mode": "IW",
+        "polarization": "VV/VH",
+        "cloud_cover_percent": null
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "browse_asset_downloaded": true,
+        "browse_asset_path": "data/research/kodagu_imagery_downloads/S1B_IW_GRDH_1SDV_20180815T130642_thumbnail.png",
+        "browse_asset_sha256": "3FA1071E59111C69A41F041DC19BEB2CF80C2B875FF32167583F201A54B628FC",
+        "authentication_or_download_note": "Unauthenticated product request returned HTTP 405 Method Not Allowed."
+      },
+      "validation_status": "browse_asset_downloaded_full_product_blocked",
+      "missing_fields": ["pre_event_pair", "pilot_subset_quality_metrics", "reviewer_assessment"],
+      "reviewer_notes": "Acquisition falls within the documented storm-level period, but does not establish record-level onset or occurrence."
+    },
+    {
+      "local_scene_key": "copernicus_s1_20180814_004813_iw_grdh",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-1-grd",
+      "product_id": "S1A_IW_GRDH_1SDV_20180814T004813_20180814T004838_023235_028685_18D2_COG",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-grd/items/S1A_IW_GRDH_1SDV_20180814T004813_20180814T004838_023235_028685_18D2_COG",
+      "acquisition_timestamp_utc": "2018-08-14T00:48:13.067781Z",
+      "temporal_role": "storm_episode_observation_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.642601, 12.506961, 77.268883, 14.697894]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 10,
+      "quality": {
+        "relative_orbit": 63,
+        "instrument_mode": "IW",
+        "polarization": "VV/VH",
+        "cloud_cover_percent": null
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Product access requires an authenticated or otherwise permitted download route; no bytes retained."
+      },
+      "validation_status": "metadata_only_download_blocked",
+      "missing_fields": ["pre_event_pair", "pilot_subset_quality_metrics", "reviewer_assessment"],
+      "reviewer_notes": "Acquisition falls within the documented storm-level period, but does not establish record-level onset or occurrence."
+    },
+    {
+      "local_scene_key": "copernicus_s1_20180722_130641_iw_slc",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-1-slc",
+      "product_id": "S1B_IW_SLC__1SDV_20180722T130641_20180722T130711_011924_015F2F_0DFE",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-slc/items/S1B_IW_SLC__1SDV_20180722T130641_20180722T130711_011924_015F2F_0DFE",
+      "acquisition_timestamp_utc": "2018-07-22T13:06:41.712424Z",
+      "temporal_role": "pre_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.642601, 12.506961, 77.268883, 14.697894]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": null,
+      "quality": {
+        "relative_orbit": 173,
+        "instrument_mode": "IW",
+        "polarization": "VV/VH",
+        "cloud_cover_percent": null
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "SLC product is catalogued with authenticated product assets; no bytes retained."
+      },
+      "validation_status": "metadata_only_download_blocked",
+      "missing_fields": ["post_event_pair", "pilot_subset_quality_metrics", "reviewer_assessment"],
+      "reviewer_notes": "A potential pre-storm SAR reference, not a stable-ground label. Requires paired processing and scientific review."
+    },
+    {
+      "local_scene_key": "copernicus_s1_20180721_004811_iw_slc",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-1-slc",
+      "product_id": "S1A_IW_SLC__1SDV_20180721T004811_20180721T004838_022885_027B5E_C68D",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-slc/items/S1A_IW_SLC__1SDV_20180721T004811_20180721T004838_022885_027B5E_C68D",
+      "acquisition_timestamp_utc": "2018-07-21T00:48:11.074979Z",
+      "temporal_role": "pre_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.642601, 12.506961, 77.268883, 14.697894]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": null,
+      "quality": {
+        "relative_orbit": 63,
+        "instrument_mode": "IW",
+        "polarization": "VV/VH",
+        "cloud_cover_percent": null
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "SLC product is catalogued with authenticated product assets; no bytes retained."
+      },
+      "validation_status": "metadata_only_download_blocked",
+      "missing_fields": ["post_event_pair", "pilot_subset_quality_metrics", "reviewer_assessment"],
+      "reviewer_notes": "A potential pre-storm SAR reference, not a stable-ground label. Requires paired processing and scientific review."
+    },
+    {
+      "local_scene_key": "copernicus_s1_20180827_130643_iw_slc",
+      "catalog": "Copernicus Data Space STAC",
+      "collection": "sentinel-1-slc",
+      "product_id": "S1B_IW_SLC__1SDV_20180827T130643_20180827T130713_012449_016F4D_183D",
+      "catalog_item_url": "https://stac.dataspace.copernicus.eu/v1/collections/sentinel-1-slc/items/S1B_IW_SLC__1SDV_20180827T130643_20180827T130713_012449_016F4D_183D",
+      "acquisition_timestamp_utc": "2018-08-27T13:06:43Z",
+      "temporal_role": "post_event_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.642601, 12.506961, 77.268883, 14.697894]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": null,
+      "quality": {
+        "relative_orbit": 173,
+        "instrument_mode": "IW",
+        "polarization": "VV/VH",
+        "cloud_cover_percent": null
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "August SLC metadata was retrieved with a bounded limit-1 retry after the earlier WAF rate limit. Product assets remain authenticated/permitted-access dependent."
+      },
+      "validation_status": "metadata_only_download_blocked",
+      "missing_fields": ["pre_event_pair", "pilot_subset_quality_metrics", "reviewer_assessment"],
+      "reviewer_notes": "Observed after the rate-limit retry. This is an acquisition date and possible post-storm SAR reference, not a record-level event date or non-event observation."
+    },
+    {
+      "local_scene_key": "usgs_landsat8_20180808_path145_row051",
+      "catalog": "USGS LandsatLook STAC",
+      "collection": "landsat-c2l2-sr",
+      "product_id": "LC08_L2SP_145051_20180808_20200831_02_T2_SR",
+      "catalog_item_url": "https://landsatlook.usgs.gov/stac-server/collections/landsat-c2l2-sr/items/LC08_L2SP_145051_20180808_20200831_02_T2_SR",
+      "acquisition_timestamp_utc": "2018-08-08T05:16:25.245472Z",
+      "temporal_role": "storm_episode_observation_candidate",
+      "geometry": {
+        "type": "Polygon",
+        "bbox": [74.3808319916915, 10.519231176693099, 76.42361459961349, 12.608822623587542]
+      },
+      "crs": "EPSG:4326",
+      "nominal_resolution_m": 30,
+      "quality": {
+        "cloud_cover_percent": 17.71,
+        "cloud_metadata_source": "eo:cloud_cover",
+        "processing_tier": "T2"
+      },
+      "access": {
+        "metadata_retrieved": true,
+        "imagery_bytes_downloaded": false,
+        "authentication_or_download_note": "Browse and metadata asset request returned EROS Registration System login HTML; no response bytes retained."
+      },
+      "validation_status": "metadata_only_download_blocked",
+      "missing_fields": ["pixel_quality_mask", "pre_event_pair", "reviewer_assessment"],
+      "reviewer_notes": "Best catalog cloud percentage observed in the July-August search, but scene-level percentage is not a pilot-level mask and access remains blocked."
+    }
+  ],
+  "summary": {
+    "scene_candidates_recorded": 14,
+    "sentinel_2_candidates": 4,
+    "sentinel_1_candidates": 6,
+    "landsat_candidates": 3,
+    "july_august_catalog_items_observed": 55,
+    "july_august_scene_candidates_recorded": 8,
+    "imagery_downloaded": true,
+    "downloaded_file_count": 1,
+    "downloaded_full_products": 0,
+    "downloaded_browse_assets": 1,
+    "human_review_completed": false,
+    "verified_non_event_observations": 0,
+    "labels_created": false
+  }
+}

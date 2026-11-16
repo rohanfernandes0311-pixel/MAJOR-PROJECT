@@ -68,6 +68,8 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         "/verify-otp",
         "/public",
         "/assets",
+        "/icons/",
+        "/images/",
         "/frontend/assets",
         "/dist",
         "/favicon.ico",
@@ -99,7 +101,6 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         "/frontend-reset",
         "/health",
         "/zones",
-        "/events",
     }
 
     async def dispatch(self, request: Request, call_next):

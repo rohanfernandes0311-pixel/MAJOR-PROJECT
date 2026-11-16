@@ -15,7 +15,7 @@ import hashlib
 import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import requests
 from backend.auth.router import router as auth_router
@@ -136,31 +136,31 @@ def _web_ui_asset(path: str, media_type: str | None = None) -> FileResponse:
 
 class LocationUpdateRequest(BaseModel):
     user_id: str = Field(..., min_length=1)
-    latitude: float
-    longitude: float
-    deformation_mm: float = 5.0
-    velocity_mm_yr: float = 12.0
-    coherence: float = 0.8
-    slope_deg: float = 24.0
-    soil_moisture_pct: float = 45.0
-    elevation_m: float = 900.0
-    ndvi: float = 0.4
-    model: str = "ensemble"
+    latitude: float = Field(..., ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(..., ge=-180, le=180, allow_inf_nan=False)
+    deformation_mm: float = Field(5.0, allow_inf_nan=False)
+    velocity_mm_yr: float = Field(12.0, allow_inf_nan=False)
+    coherence: float = Field(0.8, ge=0, le=1, allow_inf_nan=False)
+    slope_deg: float = Field(24.0, ge=0, le=90, allow_inf_nan=False)
+    soil_moisture_pct: float = Field(45.0, ge=0, le=100, allow_inf_nan=False)
+    elevation_m: float = Field(900.0, allow_inf_nan=False)
+    ndvi: float = Field(0.4, ge=-1, le=1, allow_inf_nan=False)
+    model: Literal["random_forest", "xgboost", "ensemble"] = "ensemble"
     location_name: str = "Unknown"
     phone_number: Optional[str] = None
 
 
 class ProtectedLocationUpdateRequest(BaseModel):
-    latitude: float
-    longitude: float
-    deformation_mm: float = 5.0
-    velocity_mm_yr: float = 12.0
-    coherence: float = 0.8
-    slope_deg: float = 24.0
-    soil_moisture_pct: float = 45.0
-    elevation_m: float = 900.0
-    ndvi: float = 0.4
-    model: str = "ensemble"
+    latitude: float = Field(..., ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(..., ge=-180, le=180, allow_inf_nan=False)
+    deformation_mm: float = Field(5.0, allow_inf_nan=False)
+    velocity_mm_yr: float = Field(12.0, allow_inf_nan=False)
+    coherence: float = Field(0.8, ge=0, le=1, allow_inf_nan=False)
+    slope_deg: float = Field(24.0, ge=0, le=90, allow_inf_nan=False)
+    soil_moisture_pct: float = Field(45.0, ge=0, le=100, allow_inf_nan=False)
+    elevation_m: float = Field(900.0, allow_inf_nan=False)
+    ndvi: float = Field(0.4, ge=-1, le=1, allow_inf_nan=False)
+    model: Literal["random_forest", "xgboost", "ensemble"] = "ensemble"
     location_name: str = "Mobile User"
 
 
@@ -172,16 +172,16 @@ class RouteRequest(BaseModel):
 
 
 class PredictRequest(BaseModel):
-    latitude: float
-    longitude: float
-    deformation_mm: float
-    velocity_mm_yr: float
-    coherence: float
-    slope_deg: float
-    soil_moisture_pct: float
-    elevation_m: float = 900.0
-    ndvi: float = 0.4
-    model: str = "ensemble"
+    latitude: float = Field(..., ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(..., ge=-180, le=180, allow_inf_nan=False)
+    deformation_mm: float = Field(..., allow_inf_nan=False)
+    velocity_mm_yr: float = Field(..., allow_inf_nan=False)
+    coherence: float = Field(..., ge=0, le=1, allow_inf_nan=False)
+    slope_deg: float = Field(..., ge=0, le=90, allow_inf_nan=False)
+    soil_moisture_pct: float = Field(..., ge=0, le=100, allow_inf_nan=False)
+    elevation_m: float = Field(900.0, allow_inf_nan=False)
+    ndvi: float = Field(0.4, ge=-1, le=1, allow_inf_nan=False)
+    model: Literal["random_forest", "xgboost", "ensemble"] = "ensemble"
 
 
 class AlertSubscriptionRequest(BaseModel):
@@ -371,7 +371,8 @@ def _evaluate_location(
     alert_enabled: bool,
 ) -> dict[str, Any]:
     zones_geo = load_zones(ZONE_PATH)
-    simulation_location = simulation_mode.apply_location_override(req.latitude, req.longitude)
+    # This is the live Citizen path. Admin presentation state must not replace GPS.
+    simulation_location = {"latitude": req.latitude, "longitude": req.longitude}
     eval_lat = float(simulation_location["latitude"])
     eval_lon = float(simulation_location["longitude"])
 
@@ -396,10 +397,8 @@ def _evaluate_location(
     active_zone = simulation_location.get("zone_id") or primary_zone_id(matches)
     final_risk = combine_risk(ml_pred["risk_label"], zone_risk)
 
-    simulation_state = simulation_mode.read_state()
-    # The admin-only Kodagu workflow never decorates citizen predictions or ML
-    # inputs. Legacy presentation simulation remains backward compatible.
-    simulation_enabled = bool(simulation_state["enabled"] and not simulation_state.get("is_simulation"))
+    simulation_state = {"enabled": False}
+    simulation_enabled = False
     simulated_risk = "LOW"
     if simulation_enabled:
         simulated_risk = simulation_mode.effective_forced_risk()
@@ -645,6 +644,11 @@ if WEB_UI_ASSETS_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(WEB_UI_ASSETS_DIR)), name="web-ui-assets")
     app.mount("/frontend/assets", StaticFiles(directory=str(WEB_UI_ASSETS_DIR)), name="frontend-assets")
 
+for public_directory in ("icons", "images"):
+    built_directory = WEB_UI_DIST_DIR / public_directory
+    if built_directory.exists():
+        app.mount(f"/{public_directory}", StaticFiles(directory=str(built_directory)), name=f"web-ui-{public_directory}")
+
 
 @app.get("/frontend-reset")
 def frontend_reset() -> Any:
@@ -734,9 +738,8 @@ def my_alerts(
                 "message": alert.message,
                 "timestamp": alert.timestamp,
                 "delivery_status": alert.delivered_status,
-                # All current in-app pending alerts are created by the Phase
-                # 5.5 ADMIN_SIMULATION affected-zone workflow. No status is
-                # changed when a citizen merely retrieves an alert.
+                # Preserve historical drill tagging. New real activations have
+                # a distinct status so they cannot be filtered as simulations.
                 "source_type": "ADMIN_SIMULATION" if alert.delivered_status == "in_app_pending" else None,
             }
             for alert in alerts
@@ -813,7 +816,7 @@ def landslide_inventory(
 
 
 @app.get("/events")
-def recent_events(limit: int = 30, db: Session = Depends(get_db)) -> dict[str, Any]:
+def recent_events(limit: int = 30, db: Session = Depends(get_db), _: dict = Depends(require_admin)) -> dict[str, Any]:
     limit = max(1, min(limit, 100))
     events = db.scalars(select(LocationEvent).order_by(LocationEvent.id.desc()).limit(limit)).all()
     return {"events": [
@@ -1742,7 +1745,7 @@ def activate_affected_zone_alert(
                     Alert.user_id.in_(recipient_ids),
                     Alert.risk_level == risk_level,
                     Alert.message == message,
-                    Alert.delivered_status == "in_app_pending",
+                    Alert.delivered_status.in_(["in_app_pending", "real_in_app_pending"]),
                     Alert.timestamp >= cutoff,
                 )
             ).all()
@@ -1754,7 +1757,7 @@ def activate_affected_zone_alert(
             risk_level=risk_level,
             message=message,
             timestamp=activated_at.isoformat(),
-            delivered_status="in_app_pending",
+            delivered_status="real_in_app_pending",
         )
         for user_id in recipient_ids
         if user_id not in existing_user_ids

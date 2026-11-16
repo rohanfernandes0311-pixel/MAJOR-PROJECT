@@ -36,7 +36,7 @@ test('Admin renders risk, explanations, sources, quality, recommendation, and al
   const source = await readFile(new URL('../pages/Admin.jsx', import.meta.url), 'utf8')
   assert.match(source, /assessment\.overallRisk/)
   assert.match(source, /factor\.explanation/)
-  assert.match(source, /Weather source/)
+  assert.match(source, /Assessment weather source/)
   assert.match(source, /assessment\.dataQuality/)
   assert.match(source, /assessment\.recommendedAction/)
   assert.match(source, /assessment\.automaticAlert === false \? 'OFF'/)

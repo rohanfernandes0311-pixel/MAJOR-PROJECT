@@ -1,0 +1,12 @@
+Kerela landslide.shp (application/shp) 208132 bytes.
+Kerela landslide.xml (text/xml) 1356 bytes.
+Kerela landslide.prj (application/prj) 145 bytes.
+easy-migration.zip (application/zip) 20019 bytes.
+Kerela landslide.dbf (application/dbf) 13811162 bytes.
+Kerela landslide.sbx (application/sbx) 1532 bytes.
+Kerela landslide.mif (application/vnd.mif) 247043 bytes.
+Kerela landslide.shx (application/shx) 37924 bytes.
+Kerela landslide.sbn (application/sbn) 46068 bytes.
+Kerela landslide.mid (audio/midi) 661853 bytes.
+metadata.pdf (application/pdf) 161350 bytes.
+Kerela landslide.cpg (application/octet-stream) 5 bytes.

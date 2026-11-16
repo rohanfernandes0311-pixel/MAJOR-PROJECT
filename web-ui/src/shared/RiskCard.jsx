@@ -11,7 +11,7 @@ export default function RiskCard({ risk = 'SAFE', confidence = 0.9, rainfall = 0
   const config = RISK_CONFIG[risk] || RISK_CONFIG.SAFE
 
   return (
-    <section aria-label="Current landslide risk" data-risk={risk} className="risk-card ls-card flex items-center gap-4 p-4 sm:p-5">
+    <section aria-label="Current landslide risk" data-risk={risk} className="risk-card ls-card flex items-start gap-4 p-4 sm:p-5">
       <div className={`h-14 w-2 shrink-0 rounded-full ${config.color}`} aria-hidden />
       <div className="flex-1">
         <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Current landslide risk</div>

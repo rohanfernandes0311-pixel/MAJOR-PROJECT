@@ -39,6 +39,10 @@ This repository now supports both:
 - docs/architecture.md: architecture explanation and diagram text
 - docs/architecture_drawio.xml: importable draw.io architecture file
 - docs/ieee_report.md: IEEE-style report sections for viva/demo
+- docs/ML_DATASET_QUALITY_AUDIT.md: verified dataset provenance and quality audit
+- docs/GROUND_TRUTH_DATA_CONTRACT.md: schema and labeling contract for future real observations
+- docs/ML_DATA_SOURCE_DISCOVERY.md: authoritative landslide and environmental data-source plan
+- docs/SOUTH_INDIAN_DATA_ACQUISITION_REPORT.md: provenance-preserving Kodagu and Kerala research-data acquisition
 
 ## Setup
 
@@ -80,6 +84,17 @@ python generate_dataset.py --raigad-csv path/to/raigad.csv --rainfall-csv path/t
 ```bash
 python train_models.py
 ```
+
+For a non-destructive reliability audit (including balanced and macro metrics,
+per-class results, stratified cross-validation, duplicate checks, and label
+provenance), run:
+
+```bash
+python train_models.py --audit-only
+```
+
+This writes `models/audit_metrics.json` and does not replace the production
+model artifacts.
 
 3. Test prediction engine:
 

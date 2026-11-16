@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, LogOut, MapPin, RefreshCw, ShieldCheck, Users } from 'lucide-react'
+import { Activity, AlertTriangle, MapPin, RefreshCw, ShieldCheck, Users } from 'lucide-react'
 import MapView from '../shared/MapView'
 import { apiFetch } from '../auth/authClient'
 import { useAuth } from '../auth/AuthProvider'
 import { INCIDENT_SCENARIO_LABEL, INCIDENT_SCENARIOS, getIncidentScenario } from '../data/incidentScenarios'
 import { buildDemoAlert, buildSimulatedSms, clearDemoAlert, formatIncidentDate, generateSimulatedCitizens, impactLines, previewSimulatedRecipients, saveDemoAlert } from '../services/incidentDemo'
-import { buildAdminIntelligence } from '../services/adminIntelligence'
+import { buildAdminIntelligence, createAdminLiveEnvironmentController } from '../services/adminIntelligence'
+import { weatherFields } from '../services/citizenWeather'
+import PrecipitationCard from '../shared/PrecipitationCard'
 import AdminAuditTimeline from '../components/AdminAuditTimeline'
 import AdminOfflineAlertDemo from '../components/AdminOfflineAlertDemo'
-import AdminHttpsmsExport from '../components/AdminHttpsmsExport'
 import AdminKodaguSimulation from '../components/AdminKodaguSimulation'
+import LandSenseLayout from '../components/LandSenseLayout'
 
 const RISK_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 const SIMULATION_SCENARIOS = [
@@ -61,11 +63,36 @@ function AffectedPopulationCard({ affected, realRecipientCount, simulatedCitizen
   </div>
 }
 
-function IntelligenceCard({ intelligence, loading, error, realRecipientCount, simulatedCitizens, simulationEnabled, onPreview, previewLoading }) {
+export function AdminEnvironmentalSignals({ environment }) {
+  const weather = environment?.weather
+  const fields = weatherFields(weather).filter(({ label }) => ['Temperature', 'Humidity', 'Wind speed'].includes(label))
+  const observed = weatherFields(weather).find(({ label }) => label === 'Observed')?.value
+  return <div className="mt-5">
+    <p className="section-kicker">Environmental signals</p>
+    <p className="mt-1 text-xs text-slate-400">Live observations for the selected zone · separate from risk assessment</p>
+    <div className="admin-environmental-signals mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="admin-signal rounded-xl border border-white/8 bg-white/[0.03] p-3">
+        <PrecipitationCard observation={environment?.precipitation || null} loading={Boolean(environment?.precipitationLoading)} />
+        <span className={`text-xs font-bold ${environment?.precipitation ? 'text-emerald-200' : 'text-slate-400'}`}>{environment?.precipitationLoading ? 'LOADING' : environment?.precipitation ? 'LIVE' : 'UNAVAILABLE'}</span>
+      </div>
+      {fields.map(({ label, value }) => {
+        const available = value !== 'Unavailable'
+        const loading = Boolean(environment?.weatherLoading)
+        return <div key={label} aria-busy={loading} className="admin-signal rounded-xl border border-white/8 bg-white/[0.03] p-3">
+          <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="mt-1 text-lg font-bold" role="status">{loading ? 'Loading live weather…' : value}</p>
+          <span className={`text-xs font-bold ${available ? 'text-emerald-200' : 'text-slate-400'}`}>{loading ? 'LOADING' : available ? 'LIVE' : 'UNAVAILABLE'}</span>
+          {available && !loading ? <><p className="mt-1 text-xs text-slate-400">Weatherbit</p>{observed !== 'Unavailable' ? <p className="mt-1 text-xs text-slate-400">Observed: {observed}</p> : null}</> : null}
+        </div>
+      })}
+    </div>
+  </div>
+}
+
+function IntelligenceCard({ intelligence, liveEnvironment, loading, error, realRecipientCount, simulatedCitizens, simulationEnabled, onPreview, previewLoading }) {
   if (loading) return <section className="admin-intelligence-card rounded-3xl border border-violet-300/20 bg-[#111526] p-5 text-sm text-violet-100">Loading environmental and historical intelligence…</section>
   if (error) return <section className="admin-intelligence-card rounded-3xl border border-amber-300/20 bg-[#111526] p-5"><h2 className="font-semibold">Landslide intelligence</h2><p className="mt-2 text-sm text-amber-100">{error}</p></section>
   if (!intelligence) return null
-  const values = intelligence.environmentalValues || {}
   const incident = intelligence.recentIncident
   const assessment = intelligence.assessment || {}
   const factorLabels = { rainfall: 'Rainfall', humidity: 'Humidity', temperature: 'Temperature', wind: 'Wind', historical_activity: 'Historical activity', recent_incident: 'Recent incident', ml_prediction: 'ML prediction', configured_zone: 'Configured zone' }
@@ -75,13 +102,10 @@ function IntelligenceCard({ intelligence, loading, error, realRecipientCount, si
 
   return <section className="admin-intelligence-card rounded-3xl border border-violet-300/25 bg-[#111526] p-5">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold tracking-[0.2em] text-violet-200">LANDSLIDE INTELLIGENCE</p><h2 className="mt-1 text-xl font-bold">{intelligence.zone?.name}</h2><p className="mt-1 text-xs text-slate-400">Decision support only · no alert is activated by this card</p></div><div className="text-right"><p className="text-xs text-slate-400">Overall risk</p><div className="mt-1"><RiskPill value={assessment.overallRisk} /></div><p className="mt-2 text-[11px] text-slate-500">Basis: {intelligence.overallRiskBasis}</p></div></div>
-    <div className="mt-5">
-      <p className="section-kicker">Environmental signals</p>
-      <div className="admin-environmental-signals mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Object.entries(values).map(([name, item]) => <div key={name} className="admin-signal rounded-xl border border-white/8 bg-white/[0.03] p-3"><p className="text-xs uppercase tracking-wide text-slate-400">{name}</p><p className="mt-1 text-lg font-bold">{item?.status === 'UNAVAILABLE' || item?.value == null ? 'Unavailable' : `${Number(item.value).toFixed(1)} ${item.unit}`}</p><SourceState value={item?.status} /></div>)}</div>
-    </div>
+    <AdminEnvironmentalSignals environment={liveEnvironment} />
     <div className="mt-5 grid gap-5 lg:grid-cols-2">
       <div><h3 className="text-sm font-semibold">Why is this risk elevated?</h3><div className="mt-3 space-y-2 text-sm text-slate-300">{primaryFactors.length ? primaryFactors.map((factor) => <details key={factor.factor} className="rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2"><summary className="flex cursor-pointer list-none items-center justify-between gap-3"><span>{factorLabels[factor.factor] || factor.factor}</span><span className="flex items-center gap-2"><SourceState value={factor.status} /><span className="text-[11px] text-slate-500">{factor.impact}</span></span></summary><div className="mt-2 border-t border-white/8 pt-2 text-xs text-slate-400">{factor.value != null && factor.factor !== 'ml_prediction' && factor.factor !== 'configured_zone' ? <p className="mb-1">Value: {factor.value} {factor.unit || ''}</p> : null}<p>{factor.explanation}</p></div></details>) : <p>No explanatory factors are currently available.</p>}</div><div className="mt-4 rounded-xl border border-violet-300/20 bg-violet-400/10 p-3"><p className="text-xs text-violet-200">RECOMMENDED ACTION</p><p className="mt-1 font-bold">{actionText}</p><p className="mt-1 text-xs text-slate-400">Advisory only. Admin review is required before using the existing Phase 5 workflow.</p></div></div>
-      <div><h3 className="text-sm font-semibold">Assessment quality</h3><div className="mt-3 space-y-2 text-sm">{[['Confidence', confidenceText], ['Data quality', assessment.dataQuality], ['Weather source', intelligence.weatherSource], ['Historical inventory', intelligence.historicalContext?.status], ['Recent incidents', intelligence.recentIncidentStatus], ['ML prediction', intelligence.mlRisk?.status], ['GPS', 'ADMIN CONTEXT'], ['Automatic alert', assessment.automaticAlert === false ? 'OFF' : 'UNAVAILABLE']].map(([label, status]) => <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-3 py-2"><span className="text-slate-300">{label}</span><SourceState value={status} /></div>)}</div><p className="mt-3 text-xs text-slate-400">Historical landslides inside zone: {intelligence.historicalContext?.status === 'AVAILABLE' ? intelligence.historicalContext.nearby_count : 'Unavailable'} · historical context only</p></div>
+      <div><h3 className="text-sm font-semibold">Assessment quality</h3><div className="mt-3 space-y-2 text-sm">{[['Confidence', confidenceText], ['Data quality', assessment.dataQuality], ['Assessment weather source', intelligence.weatherSource], ['Historical inventory', intelligence.historicalContext?.status], ['Recent incidents', intelligence.recentIncidentStatus], ['ML prediction', intelligence.mlRisk?.status], ['GPS', 'ADMIN CONTEXT'], ['Automatic alert', assessment.automaticAlert === false ? 'OFF' : 'UNAVAILABLE']].map(([label, status]) => <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-black/15 px-3 py-2"><span className="text-slate-300">{label}</span><SourceState value={status} /></div>)}</div><p className="mt-3 text-xs text-slate-400">Historical landslides inside zone: {intelligence.historicalContext?.status === 'AVAILABLE' ? intelligence.historicalContext.nearby_count : 'Unavailable'} · historical context only</p></div>
     </div>
     <div className="mt-5"><AffectedPopulationCard affected={intelligence.affected} realRecipientCount={realRecipientCount} simulatedCitizens={simulatedCitizens} simulationEnabled={simulationEnabled} onPreview={onPreview} previewLoading={previewLoading} /></div>
     <div className="mt-5 border-t border-white/10 pt-4"><h3 className="text-sm font-semibold">Recent incident context</h3>{incident ? <div className="mt-3 rounded-xl border border-orange-300/20 bg-orange-400/5 p-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><b>{incident.title}</b><SourceState value={incident.status} /></div><p className="mt-2 text-slate-300">Date: {formatIncidentDate(incident.date)}</p><p className="mt-1 text-slate-300">Location: {incident.location_name}, {incident.district} · {incident.location_precision}</p><p className="mt-1 text-slate-300">Classification: {incident.classification}</p><p className="mt-1 text-slate-300">Source: <a href={incident.source_url} target="_blank" rel="noreferrer" className="text-cyan-200 underline">{incident.source_label}</a></p></div> : <p className="mt-2 text-sm text-slate-400">NONE IDENTIFIED. Absence of a matched scenario is not evidence of safety.</p>}</div>
@@ -117,6 +141,8 @@ export default function Admin() {
   const [demoRecipientPreview, setDemoRecipientPreview] = useState(null)
   const [demoLaunchResult, setDemoLaunchResult] = useState(null)
   const [zoneIntelligence, setZoneIntelligence] = useState(null)
+  const [adminLiveEnvironment, setAdminLiveEnvironment] = useState(null)
+  const liveEnvironmentController = useRef(null)
   const [intelligenceLoading, setIntelligenceLoading] = useState(false)
   const [intelligenceError, setIntelligenceError] = useState('')
   const [auditEvents, setAuditEvents] = useState([])
@@ -129,6 +155,24 @@ export default function Admin() {
   const [offlineDemoConfirmed, setOfflineDemoConfirmed] = useState(false)
   const [offlineDemoLoading, setOfflineDemoLoading] = useState(false)
   const [offlineDemoResult, setOfflineDemoResult] = useState(null)
+
+  useEffect(() => {
+    const controller = createAdminLiveEnvironmentController({
+      request: (path, options) => apiFetch(path, options, token),
+      onChange: setAdminLiveEnvironment,
+    })
+    liveEnvironmentController.current = controller
+    return () => { controller.dispose(); liveEnvironmentController.current = null }
+  }, [token])
+
+  const liveZone = zoneIntelligence?.zone
+  useEffect(() => {
+    liveEnvironmentController.current?.setZone(liveZone?.zone_id === selectedConfiguredZone ? liveZone : null)
+  }, [token, selectedConfiguredZone, liveZone?.zone_id, liveZone?.latitude, liveZone?.longitude])
+
+  const selectedLiveEnvironment = adminLiveEnvironment?.zoneId === selectedConfiguredZone
+    && Object.is(adminLiveEnvironment?.latitude, liveZone?.latitude) && Object.is(adminLiveEnvironment?.longitude, liveZone?.longitude)
+    ? adminLiveEnvironment : { weatherLoading: true, precipitationLoading: true }
 
   const loadAuditEvents = useCallback(async (offset = 0) => {
     if (offset === 0) setAuditLoading(true)
@@ -488,20 +532,19 @@ export default function Admin() {
     { label: 'System status', value: systemSummary, icon: ShieldCheck, tone: systemSummary === 'Operational' ? 'text-emerald-200' : 'text-amber-100' }
   ]
 
+  const navigation = [
+    { id: 'overview', label: 'Overview', href: '#admin-overview', active: true },
+    { id: 'risk-zones', label: 'Risk zones', href: '#admin-risk-zones' },
+    { id: 'alerts', label: 'Alerts', href: '#admin-alerts' },
+    { id: 'users', label: 'Users', href: '#admin-users' },
+    { id: 'analytics', label: 'Analytics', href: '#incident-intelligence-map' },
+    { id: 'system', label: 'System', href: '#admin-system' }
+  ]
+
   return (
+    <LandSenseLayout items={navigation}>
     <main className="admin-shell px-3 py-4 sm:px-6 lg:px-8">
       <div className="admin-layout mx-auto max-w-[1600px]">
-        <aside className="admin-sidebar" aria-label="Admin navigation">
-          <div className="admin-sidebar-brand"><img src="/icons/landsense-logo.png" alt="" className="h-5 w-5 rounded-md object-contain" />LandSense</div>
-          <nav>
-            <a href="#admin-overview" aria-current="page">Overview</a>
-            <a href="#admin-risk-zones">Risk zones</a>
-            <a href="#admin-alerts">Alerts</a>
-            <a href="#admin-users">Users</a>
-            <a href="#incident-intelligence-map">Analytics</a>
-            <a href="#admin-system">System</a>
-          </nav>
-        </aside>
         <div className="admin-content space-y-4">
         <header className="admin-page-header flex flex-col gap-4 border-b border-[#dfe5df] bg-white p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
@@ -514,7 +557,6 @@ export default function Admin() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">Admin: {profile?.phone_masked || profile?.phone || profile?.uid || 'Authenticated operator'}</div>
             <button onClick={refreshDashboard} disabled={loading || zoneLoading} className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-100 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading || zoneLoading ? 'animate-spin' : ''}`} /> Refresh</button>
-            <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5"><LogOut className="h-4 w-4" /> Logout</button>
           </div>
         </header>
 
@@ -579,19 +621,18 @@ export default function Admin() {
               </div>
             </div> : null}
           </div>
-          {selectedConfiguredZone ? <div className="mt-4"><IntelligenceCard intelligence={zoneIntelligence} loading={intelligenceLoading} error={intelligenceError} simulatedCitizens={displayedSimulatedCitizens} simulationEnabled={simulation.enabled} onPreview={previewRecipients} previewLoading={previewLoading} realRecipientCount={realRecipientCount} /></div> : null}
+          {selectedConfiguredZone ? <div className="mt-4"><IntelligenceCard intelligence={zoneIntelligence} liveEnvironment={selectedLiveEnvironment} loading={intelligenceLoading} error={intelligenceError} simulatedCitizens={displayedSimulatedCitizens} simulationEnabled={simulation.enabled} onPreview={previewRecipients} previewLoading={previewLoading} realRecipientCount={realRecipientCount} /></div> : null}
           {recipientPreview ? <div className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-400/5 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Recipient preview</h3><p className="mt-1 text-sm text-cyan-100">Users inside zone: {recipientPreview.recipient_count} of {recipientPreview.total_registered_users} registered users</p><p className="mt-1 text-sm font-semibold text-violet-200">Eligible SMS recipients: {recipientPreview.sms_eligible_count ?? 0}</p></div><span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-xs font-bold text-amber-100">PREVIEW ONLY · ADMIN SIMULATION</span></div><p className="mt-2 text-xs text-slate-400">{recipientPreview.affected_zone?.name} · starts {displayTime(recipientPreview.affected_zone?.start_time)} · expires {displayTime(recipientPreview.affected_zone?.expires_at)}</p><div className="mt-3 overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="border-b border-white/10 text-slate-400"><tr><th className="px-2 py-2">User</th><th className="px-2 py-2">Location</th><th className="px-2 py-2">Last updated</th><th className="px-2 py-2">Risk</th></tr></thead><tbody>{recipientPreview.recipients?.map((recipient) => <tr key={recipient.user_id} className="border-b border-white/5"><td className="px-2 py-2">{recipient.phone_masked || recipient.user_id}</td><td className="px-2 py-2 font-mono text-xs">{Number(recipient.latitude).toFixed(5)}, {Number(recipient.longitude).toFixed(5)}</td><td className="px-2 py-2 text-slate-400">{displayTime(recipient.last_updated)}</td><td className="px-2 py-2">{recipient.current_risk ? <RiskPill value={recipient.current_risk} /> : '—'}</td></tr>)}{!recipientPreview.recipients?.length ? <tr><td colSpan="4" className="px-2 py-4 text-center text-slate-400">No registered users are currently inside this zone.</td></tr> : null}</tbody></table></div><p className="mt-3 text-sm text-amber-100">Preview only — no alert has been sent.</p></div> : null}
           {recipientPreview && !activationResult ? <div className="mt-3 rounded-xl border border-amber-300/30 bg-amber-400/10 p-3"><label className="flex items-start gap-3 text-sm"><input type="checkbox" checked={sendSms} onChange={(event) => setSendSms(event.target.checked)} disabled={recipientPreview.simulation_mode || simulation.enabled} className="mt-1 h-4 w-4" /><span><b>Send SMS to eligible users</b><span className="mt-1 block text-xs text-amber-50">In-app alert will always be created. SMS is optional and only sent to eligible users inside the zone.</span></span></label>{simulation.enabled ? <p className="mt-2 text-sm font-semibold text-amber-200">SIMULATION MODE — real configured-zone activation is disabled. Turn simulation off to activate.</p> : null}{sendSms && !recipientPreview.sms_configuration?.configured ? <p className="mt-2 text-xs text-rose-200">Twilio SMS is not configured. In-app alerts will still be created.</p> : null}{sendSms && (recipientPreview.sms_eligible_count ?? 0) > (recipientPreview.sms_max_recipients ?? 25) ? <p className="mt-2 text-xs text-rose-200">Eligible recipients exceed the SMS batch limit of {recipientPreview.sms_max_recipients}. SMS will be refused without truncation.</p> : null}{activationConfirm ? <><p className="mt-3 text-sm font-semibold text-amber-100">{sendSms ? `Send SMS to ${recipientPreview.sms_eligible_count ?? 0} eligible users?` : `Create in-app alerts for ${recipientPreview.recipient_count} users?`}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setActivationConfirm(false)} disabled={activationLoading} className="rounded-lg border border-white/15 px-3 py-2 text-sm">Cancel</button><button type="button" onClick={activateTargetedAlert} disabled={activationLoading || simulation.enabled} className="rounded-lg bg-amber-300 px-3 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">{activationLoading ? 'Activating…' : sendSms ? 'Send SMS' : 'Activate alert'}</button></div></> : <button type="button" disabled={!recipientPreview.recipient_count || simulation.enabled} onClick={() => setActivationConfirm(true)} className="mt-3 rounded-xl bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-50">Activate targeted alert</button>}</div> : null}
           {activationResult ? <div className={`mt-3 rounded-xl border px-3 py-3 text-sm ${activationResult.sms_failed || activationResult.status === 'sms_batch_limit_exceeded' ? 'border-rose-300/25 bg-rose-400/10 text-rose-100' : 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100'}`}><p>In-app alerts created: {activationResult.in_app_created_count ?? 0} of {activationResult.recipient_count} recipients.</p><p className="mt-1">SMS eligible: {activationResult.sms_eligible_count}; attempted: {activationResult.sms_attempted}; sent: {activationResult.sms_sent}; failed: {activationResult.sms_failed}; suppressed: {activationResult.sms_suppressed}.</p>{activationResult.status === 'simulation_sms_suppressed' ? <p className="mt-1 font-semibold">Simulation mode — SMS suppressed.</p> : null}{activationResult.status === 'sms_provider_unavailable' ? <p className="mt-1 font-semibold">Twilio is not configured. In-app delivery succeeded.</p> : null}{activationResult.status === 'sms_batch_limit_exceeded' ? <p className="mt-1 font-semibold">SMS batch limit exceeded. No SMS was attempted; in-app delivery succeeded.</p> : null}{activationResult.deduplicated_count ? <p className="mt-1">{activationResult.deduplicated_count} duplicate recipient(s) were suppressed.</p> : null}</div> : null}
         </section>
 
-        <AdminHttpsmsExport key={`${simulation.enabled}:${selectedConfiguredZone}:${selectedIncidentScenario}`} zoneId={selectedIncidentScenario ? '' : selectedConfiguredZone} simulationEnabled={simulation.enabled} token={token} />
         <AdminAuditTimeline events={auditEvents} loading={auditLoading} error={auditError} hasMore={auditHasMore} loadingMore={auditLoadingMore} onRetry={() => loadAuditEvents(0)} onLoadMore={() => loadAuditEvents(auditEvents.length)} />
 
         <section id="incident-intelligence-map" className="admin-map-section grid scroll-mt-4 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,.65fr)]">
-          <div className="overflow-hidden rounded-3xl border border-white/8 bg-[#0c1724] p-4">
+          <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-white/8 bg-[#0c1724] p-4">
             <div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Incident intelligence map</h2><p className="text-xs text-slate-400">{simulation.is_simulation ? (simulation.synthetic_zone?.geometry ? 'Kodagu simulation overlays are displayed on this existing map; normal incident and inventory layers remain unchanged.' : 'Simulation map geometry unavailable. No verified project geometry exists for this location. Safer route unavailable. No verified route geometry exists.') : activeMapIncident ? 'Simulation is active. The map is centered on the selected demo incident and circular affected area.' : contextualMapIncident ? 'The configured zone, matched recent incident, affected radius, and real population are shown together.' : simulation.enabled && selectedIncident ? 'Selected incident location is unavailable.' : selectedIncident ? 'Enable Simulation Mode to display the selected incident on the map.' : selectedConfiguredZoneGeometry?.geometry ? 'The selected configured zone is highlighted and fitted in view. Selection does not activate an alert.' : selectedConfiguredZone ? 'Selected zone geometry is unavailable.' : 'Select a configured zone or enable simulation and choose an incident to focus the map.'}</p></div><MapPin className="h-5 w-5 text-cyan-200" /></div>
-            <div className="h-[390px] overflow-hidden rounded-2xl"><MapView key={adminMapKey} zones={zones} simulatedLocation={activeMapIncident ? null : simulationLocation} simulatedCitizens={displayedSimulatedCitizens} syntheticZone={simulation.synthetic_zone} simulationRoute={simulation.route} showSimulationLayers={String(profile?.role || '').toLowerCase() === 'admin' && simulation.enabled && simulation.is_simulation} affectedUserLocations={realAffectedUsers} incidentLocation={mapIncidentLocation} incidentRadiusMeters={mapIncident?.affected_radius_meters || 0} incidentMode={incidentDemoMode} mapContext={mapContext} recipientLocations={recipientPreview?.recipients || []} selectedZone={selectedConfiguredZoneGeometry} selectedZoneRisk={selectedConfiguredZoneGeometry?.properties?.risk_level || ''} selectedZoneDuration={affectedDuration} risk={mapIncident?.demo_risk || (simulation.enabled ? simulation.effective_risk : (data.events[0]?.final_risk || 'SAFE'))} simulation={simulation.enabled} landslideRecords={data.landslides} onRiskAreaSelect={selectOfflineDemoArea} /></div>
+            <div className="h-[390px] overflow-hidden rounded-2xl xl:h-auto xl:min-h-0 xl:flex-1"><MapView key={adminMapKey} zones={zones} simulatedLocation={activeMapIncident ? null : simulationLocation} simulatedCitizens={displayedSimulatedCitizens} syntheticZone={simulation.synthetic_zone} simulationRoute={simulation.route} showSimulationLayers={String(profile?.role || '').toLowerCase() === 'admin' && simulation.enabled && simulation.is_simulation} affectedUserLocations={realAffectedUsers} incidentLocation={mapIncidentLocation} incidentRadiusMeters={mapIncident?.affected_radius_meters || 0} incidentMode={incidentDemoMode} mapContext={mapContext} recipientLocations={recipientPreview?.recipients || []} selectedZone={selectedConfiguredZoneGeometry} selectedZoneRisk={selectedConfiguredZoneGeometry?.properties?.risk_level || ''} selectedZoneDuration={affectedDuration} risk={mapIncident?.demo_risk || (simulation.enabled ? simulation.effective_risk : (data.events[0]?.final_risk || 'SAFE'))} simulation={simulation.enabled} landslideRecords={data.landslides} onRiskAreaSelect={selectOfflineDemoArea} /></div>
             {simulation.enabled && !offlineDemoPreview ? <p className="mt-3 rounded-xl border border-red-300/20 bg-red-400/5 px-3 py-2 text-sm text-red-100">Click a configured red HIGH / CRITICAL zone or the selected incident's circular affected area to calculate affected registered users and open the offline alert demonstration.</p> : null}
             <AdminOfflineAlertDemo preview={offlineDemoPreview} channels={offlineDemoChannels} onChannelChange={(channel, checked) => { setOfflineDemoChannels((current) => ({ ...current, [channel]: checked })); setOfflineDemoResult(null) }} confirmation={offlineDemoConfirmed} onConfirmationChange={setOfflineDemoConfirmed} onSend={sendOfflineDemoAlert} loading={offlineDemoLoading} result={offlineDemoResult} />
           </div>
@@ -615,5 +656,6 @@ export default function Admin() {
         </div>
       </div>
     </main>
+    </LandSenseLayout>
   )
 }

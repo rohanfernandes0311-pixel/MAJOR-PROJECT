@@ -1,0 +1,208 @@
+{
+  "generated_at_utc": "2026-10-09T17:43:11Z",
+  "purpose": "Research-only acquisition manifest; production data and artifacts are untouched.",
+  "sources": [
+    {
+      "source": "kodagu_2018",
+      "publisher": "Arpithaachaiah6 GitHub repository",
+      "repository_commit": "9a49788babe1aa92e3d0919ae41fcc34044fff91",
+      "url": "https://github.com/Arpithaachaiah6/Landslide-inventory-for-the-2018-storm-event-of-Kodagu-in-the-Western-Ghats",
+      "license": "CC BY-SA 4.0 (repository LICENSE)",
+      "access_tested": true,
+      "retrieval_utc": "2026-10-09T17:43:11Z",
+      "files": [
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.cpg",
+          "bytes": 5,
+          "sha256": "3AD3031F5503A4404AF825262EE8232CC04D4EA6683D42C5DD0A2F2A27AC9824"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.dbf",
+          "bytes": 75157,
+          "sha256": "3E40AB49A191AF19922FD595EA418CAACDD1B89EC7746484D3DA14DF57B743E8"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.prj",
+          "bytes": 401,
+          "sha256": "58368FF5825675F291B623E0132D25CE8D7E56C478DFB5431F84247FE1A80BD2"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.sbn",
+          "bytes": 2836,
+          "sha256": "92F484445AFDFC88AD1B4806FACA716DF7AC24D5D64F0F8D7195DF9D4D35F1CC"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.sbx",
+          "bytes": 252,
+          "sha256": "C128678E01B3A03144C75726986BB6E15DE863964087878B96C22821034CD628"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.shp",
+          "bytes": 11848,
+          "sha256": "BA075300619CFB6B3E6A2014B0D0366E7049A8305266250830D4C5E02F9D734D"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.shp.xml",
+          "bytes": 8900,
+          "sha256": "FEDF99E716B9B80D2AB91F821E2DC317F5B89ECB1644890B34FC2510C9FCB191"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_Points.shx",
+          "bytes": 2236,
+          "sha256": "A2BFA4B233FDC18B9AFD5CBC99F2FA741DBB307F5D0D79A2CD33D27A4A23B3A8"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.cpg",
+          "bytes": 5,
+          "sha256": "3AD3031F5503A4404AF825262EE8232CC04D4EA6683D42C5DD0A2F2A27AC9824"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.dbf",
+          "bytes": 65262,
+          "sha256": "4A91FD64989416F4FAF395E98A0E4874192474A1D9032DEFD460B7D9A1B517ED"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.prj",
+          "bytes": 266,
+          "sha256": "54AC73040E3DB97101A57E2DFBC0A0292473FEBF8F7C4BF67F32132DD18EB285"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.sbn",
+          "bytes": 2196,
+          "sha256": "B46BED3CD48089D6FF9C606FBDA9612A79AA700DE78509C9D51B8DFA478886FB"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.sbx",
+          "bytes": 228,
+          "sha256": "BE9EFC69D8B67DB04EC22C74C34C01BD5E22288296B9B37EDFB1B1EA56FE09B1"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.shp",
+          "bytes": 2493220,
+          "sha256": "9C6E566BBDABA5714162A0A027D81C2044BFF50208BBFB974F4F63ADDF0C958E"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.shp.xml",
+          "bytes": 11936,
+          "sha256": "B70A200A8D7B4958666C018F5D1DFCBD78390B1023D0E78BFF265D23F64F451D"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/Landslide_polygons.shx",
+          "bytes": 1836,
+          "sha256": "ED757AECA3D4DC39A28F6D2129699DCFA9E5E6E5B216E1BB1B2FE320DC863328"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/LICENSE",
+          "bytes": 20137,
+          "sha256": "23EE78C8BAE49CF08EA2F0C84945C66B987EBE4520881FB51B3DAD4FB43D07C2"
+        },
+        {
+          "path": "data/external/kodagu_2018/raw/README.md",
+          "bytes": 2689,
+          "sha256": "DF8B1E9F382191809E5E040F81E589C98572CF9E6D8BC0A659D04924094A5387"
+        }
+      ],
+      "validation": {
+        "points_records": 267,
+        "polygons_records": 217,
+        "point_polygon_covers": 60,
+        "polygon_invalid": 6,
+        "point_duplicate_geometries": 0,
+        "polygon_duplicate_geometries": 0
+      }
+    },
+    {
+      "source": "kerala_2018",
+      "publisher": "DANS Data Station Physical and Technical Sciences / C.J. van Westen",
+      "doi": "10.17026/DANS-X6C-Y7X2",
+      "url": "https://doi.org/10.17026/DANS-X6C-Y7X2",
+      "license": "CC BY 4.0 (landing page)",
+      "access_tested": true,
+      "retrieval_utc": "2026-10-09T17:43:11Z",
+      "original_archive": "data/external/kerala_2018/raw/kerala_2018_original.zip",
+      "files": [
+        {
+          "path": "data/external/kerala_2018/raw/kerala_2018_original.zip",
+          "bytes": 735446,
+          "sha256": "C085E9D6F16FA51D9AE28EBF60471D142AC63FB8682943C101D739DF7A08BCD1"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/easy-migration.zip",
+          "bytes": 20019,
+          "sha256": "3E69362EC608816AD1D68998193C70D53713299AB3749DEA12A9998A55DAD8FA"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.cpg",
+          "bytes": 5,
+          "sha256": "3AD3031F5503A4404AF825262EE8232CC04D4EA6683D42C5DD0A2F2A27AC9824"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.dbf",
+          "bytes": 13811162,
+          "sha256": "ED4285A158D7DDDB63A4201A6BD5B96DD5CFC4C2990207560B502BFEF310A032"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.mid",
+          "bytes": 661853,
+          "sha256": "75B7FA2E3AC623382DD88F38465E60B8DA313220342DAEAAFA6599E8BDBDAE91"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.mif",
+          "bytes": 247043,
+          "sha256": "628EFB90D66EB934D0C44F3166A0188D34C3B481DB6760FF08C12AF08258DDAB"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.prj",
+          "bytes": 145,
+          "sha256": "A02A27B1D1982C8516D83398E85A3C8B1AEF1713C13EF4D84D7BDE17430C07C4"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.sbn",
+          "bytes": 46068,
+          "sha256": "6A82E8F94905F8DEE14C5B1129707C96E76E4F63D44B2C8BDDF39C4279F2FE3C"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.sbx",
+          "bytes": 1532,
+          "sha256": "042E701F8F848B6B03B35DDB3A5B161593785515BC9B298AB1698CB36A525DA4"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.shp",
+          "bytes": 208132,
+          "sha256": "D59779D003C0AFE3829BC87CC2211BD046CF91F9FFE3D701C425420536FA1011"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.shx",
+          "bytes": 37924,
+          "sha256": "5AD6D083857AC932D204109B051969D9EE55AC68D63E103F606ED88ADB512F9E"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/Kerela landslide.xml",
+          "bytes": 1356,
+          "sha256": "0D4B55D7A04D1A7246D7B455469B12A697A1017A1A0B1E7E2529B28AFE26F2A4"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/MANIFEST.TXT",
+          "bytes": 626,
+          "sha256": "CCDCCF3AD5F94DD6355F562DB39F1913178B04608D33A942E954F68D80838A02"
+        },
+        {
+          "path": "data/external/kerala_2018/raw/archive_contents/metadata.pdf",
+          "bytes": 161350,
+          "sha256": "A8732BAFD7C9AF5930829A29FA6ADFB00D2ABE0C958BD5B43B1FEC154C33FFEE"
+        }
+      ],
+      "validation": {
+        "records": 4728,
+        "geometry": "POINTZ",
+        "duplicate_geometries": 0,
+        "crs": "WGS 84 geographic"
+      }
+    }
+  ],
+  "cross_source_checks": {
+    "exact_coordinate_matches_after_crs_normalization": 0,
+    "minimum_kodagu_to_kerala_point_distance_km": 7.657,
+    "interpretation": "No records were merged or treated as duplicates; event proximity requires source/event investigation."
+  }
+}

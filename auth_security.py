@@ -8,9 +8,13 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from pathlib import Path
 
 import jwt
 from fastapi import HTTPException, Request
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 
 ACCESS_TOKEN_TTL_MIN = int(os.getenv("ACCESS_TOKEN_TTL_MIN", "15"))

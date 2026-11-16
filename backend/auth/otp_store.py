@@ -343,6 +343,15 @@ def get_user_session_by_jti(
         db.close()
 
 
+def get_user_session_by_id(session_id: str) -> dict[str, Any] | None:
+    db = SessionLocal()
+    try:
+        session = db.get(UserSession, session_id)
+        return _user_session_to_dict(session) if session else None
+    finally:
+        db.close()
+
+
 def revoke_user_session(
     token_jti: str,
 ) -> bool:
