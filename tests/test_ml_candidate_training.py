@@ -83,6 +83,18 @@ class MlCandidateTrainingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             predict.batch_predict(pd.DataFrame({"deformation_mm": [1.0]}))
 
+    def test_exact_shapley_explanation_adds_to_unchanged_model_scores(self):
+        result = predict.predict(5., 12., .8, 18., 24., 45., 900., 180., .4, "ensemble")
+        explanation = predict.explain_prediction(result["feature_values"], "ensemble")
+        self.assertEqual(explanation["feature_order"], predict.FEATURES)
+        self.assertEqual(explanation["prediction_probabilities"], result["probabilities"])
+        for label in ("Low", "Medium", "High"):
+            reconstructed = explanation["base_probabilities"][label] + sum(
+                values[label] for values in explanation["contributions"].values()
+            )
+            self.assertAlmostEqual(reconstructed, result["probabilities"][label], places=10)
+        self.assertIn("not calibrated real-world probabilities", " ".join(explanation["limitations"]))
+
     def test_dataset_hash_is_stable_for_current_file(self):
         digest = hashlib.sha256(candidates.DATA_PATH.read_bytes()).hexdigest()
         self.assertEqual(len(digest), 64)
