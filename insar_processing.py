@@ -259,10 +259,10 @@ def inverse_velocity_method(
     velocity[velocity <= 0] = 1e-6   # avoid division by zero / negative
 
     # Rolling mean velocity
-    smooth_v = pd.Series(velocity).rolling(window, min_periods=1).mean().values
+    smooth_v = pd.Series(velocity).rolling(window, min_periods=1).mean().to_numpy(dtype=float)
 
     # Inverse velocity
-    inv_v = 1.0 / smooth_v
+    inv_v = np.reciprocal(smooth_v)
 
     # Linear regression on last portion to find failure intercept
     n_fit  = max(window, n // 3)
