@@ -79,7 +79,7 @@
 .simulation-badge { display: inline-block; padding: 3px 6px; border-radius: 3px; background: #f0f3f1; color: #66736e; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .simulation-badge-danger { color: #b73535; background: #fcecec; }
 .simulation-badge-eligible { color: var(--sim-green); background: #eaf5f0; }
-.simulation-message { resize: vertical; min-height: 130px; line-height: 1.65; }
+.simulation-message { resize: vertical; min-height: 130px; line-height: 1.65; font-family: "Noto Sans Kannada", "Nirmala UI", "Tunga", system-ui, sans-serif; }
 .simulation-message[readonly] { background: #f8faf9; }
 .simulation-timeline { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
 .simulation-timeline-event { padding: 8px 0 0; border-top: 2px solid var(--sim-border); }

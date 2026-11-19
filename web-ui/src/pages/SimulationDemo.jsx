@@ -6,6 +6,8 @@ import MapView from '../shared/MapView'
 import '../styles/simulation-demo.css'
 import { buildSimulationScenario, SIMULATION_LOCATIONS } from '../services/localSimulation'
 import { scenarioKey, toggleRecipient, toggleDemoAdmin, exportSelections, activeAdminActor, simulationExcelFilename } from '../services/simulationRecipients'
+import { SIMULATION_MESSAGE_LANGUAGE_ENABLED } from '../data/simulationMessageTranslations'
+import { buildSimulationMessage, estimateSmsSegments } from '../services/simulationMessage'
 
 const LOCATIONS = SIMULATION_LOCATIONS
 const EMPTY = []
@@ -36,6 +38,8 @@ export default function SimulationDemo() {
   const [loading, setLoading] = useState(false)
   const key = scenarioKey(location, risk)
   const message = drafts[key]?.message ?? ''
+  const messageLanguage = drafts[key]?.messageLanguage || 'en'
+  const messageSegments = estimateSmsSegments(message)
   const selectedIds = drafts[key]?.selected || EMPTY
   const selectedAdmins = drafts[key]?.demoAdmins || EMPTY
   const selections = exportSelections(drafts)
@@ -69,10 +73,12 @@ export default function SimulationDemo() {
         setScenario(result)
         setDrafts(previous => {
           const old = previous[key]
-          const selected = old?.scenario.revision === result.revision ? old.selected : []
-          const nextMessage = old?.scenario.revision === result.revision ? old.message : result.message
+          const sameScenario = old?.scenario.revision === result.revision
+          const selected = sameScenario ? old.selected : []
+          const nextLanguage = old?.messageLanguage || 'en'
+          const nextMessage = sameScenario ? old.message : nextLanguage === 'en' ? result.message : buildSimulationMessage(result.location, result.risk, nextLanguage)
           const demoAdmins = (old?.demoAdmins || []).filter(id => result.demoAdminRecipients.some(admin => admin.recipientId === id && admin.selectable))
-          return { ...previous, [key]: { scenario: result, selected, demoAdmins, message: nextMessage } }
+          return { ...previous, [key]: { ...old, scenario: result, selected, demoAdmins, message: nextMessage, messageLanguage: nextLanguage, messageEdited: sameScenario ? old.messageEdited : false } }
         })
       })
       .catch(err => { if (active) setError(detail(err)) })
@@ -83,6 +89,11 @@ export default function SimulationDemo() {
   function select(nextLocation, nextRisk) {
     revision.current++; setNotice(''); setReset(false)
     setParams({ location: nextLocation, risk: nextRisk })
+  }
+  function changeMessageLanguage(nextLanguage) {
+    if (drafts[key]?.messageEdited && !window.confirm('Replace your edited message?')) return
+    setDrafts(previous => ({ ...previous, [key]: { ...previous[key], messageLanguage: nextLanguage, message: buildSimulationMessage(location, risk, nextLanguage), messageEdited: false } }))
+    setNotice('')
   }
   async function generateExcel() {
     if (!selections.length) { setError('Select at least one recipient to generate the Excel.'); return }
@@ -183,9 +194,11 @@ export default function SimulationDemo() {
         </label>)}</div>
       </section>
       <section className={`${card} mt-5`} aria-label="Emergency message preview"><h2 className="font-semibold">SIMULATION MESSAGE</h2><p className="mt-2 text-sm">Location: {location} · Risk: {risk} · Selected Recipients: {selectedIds.length} registered users · {selectedAdmins.length} Demo Admins</p>
-        <label htmlFor="simulation-message" className="mt-4 block text-sm">Message</label><textarea id="simulation-message" readOnly={!editing || busy} value={message} maxLength={1000} rows={5} onChange={e => { setDrafts(previous => ({ ...previous, [key]: { ...previous[key], message: e.target.value } })); setNotice('') }} className="simulation-input simulation-message" />
+        {SIMULATION_MESSAGE_LANGUAGE_ENABLED ? <label className="mt-4 block text-sm">Message language<select className="simulation-input" value={messageLanguage} onChange={event => changeMessageLanguage(event.target.value)}><option value="en">English</option><option value="kn">ಕನ್ನಡ (Kannada)</option><option value="both">English + Kannada</option></select></label> : null}
+        <label htmlFor="simulation-message" className="mt-4 block text-sm">Message</label><textarea id="simulation-message" lang={messageLanguage === 'en' ? 'en' : 'kn'} readOnly={!editing || busy} value={message} maxLength={1000} rows={5} onChange={e => { setDrafts(previous => ({ ...previous, [key]: { ...previous[key], message: e.target.value, messageEdited: true } })); setNotice('') }} className="simulation-input simulation-message" />
         <p className="mt-2 text-xs simulation-secondary">This message is used only in the generated simulation httpSMS Excel.</p>
-        <p className="mt-1 text-xs simulation-secondary">{message.length}/1000 characters. Exports always carry a SIMULATION ONLY prefix.</p>
+        <p className="mt-1 text-xs simulation-secondary">{message.length}/1000 characters{SIMULATION_MESSAGE_LANGUAGE_ENABLED ? ` · ${messageSegments.segments} SMS segment${messageSegments.segments === 1 ? '' : 's'} (${messageSegments.encoding}; ${messageSegments.singleSegmentLimit} single / ${messageSegments.splitSegmentLimit} split)` : ''}. Exports always carry a SIMULATION ONLY prefix.</p>
+        {SIMULATION_MESSAGE_LANGUAGE_ENABLED && messageSegments.segments > 1 ? <p role="status" className="mt-1 text-xs simulation-feedback-error">This message uses {messageSegments.segments} SMS segments.</p> : null}
         <div className="mt-4 flex flex-wrap gap-3"><button className={button} disabled={busy} onClick={() => setEditing(value => !value)}>{editing ? 'Finish Editing' : 'Edit Message'}</button><button className={button} disabled={busy || loading || !selections.length || !message.trim()} onClick={generateExcel}>{busy ? 'Generating…' : 'Generate Excel'}</button><button className={`${button} border-[#176B52] text-[#176B52]`} disabled={!canDownload} onClick={download}>↓ Download Excel</button></div>
         <p className="mt-4 text-xs simulation-secondary">Excel columns: FromPhoneNumber · ToPhoneNumber · Content · SendTime(optional). Sender uses HTTPSMS_FROM_NUMBER; send time stays blank. No SMS is automatically sent.</p>
       </section>
