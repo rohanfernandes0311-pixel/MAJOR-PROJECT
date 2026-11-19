@@ -64,9 +64,26 @@ test('elevated Citizen warnings expose existing route and safety-guidance action
   assert.match(publicSource, /Play safety guidance/)
   assert.match(publicSource, /scrollToSection\(routeRef\)/)
   assert.match(panel, /Play safety guidance/)
-  assert.match(publicSource, /relevantTargetedAlerts = targetedAlerts\.filter/)
-  assert.match(publicSource, /Active alert for elevated risk/)
+  assert.match(publicSource, /apiFetch\('\/alerts\/my'/)
+  assert.match(publicSource, /alertNotificationManagerRef\.current\.observe\(alerts/)
+  assert.match(publicSource, /setInterval\(refreshTargetedAlerts, 60000\)/)
   assert.doesNotMatch(publicSource, /onClick=\{findSaferRoute\}/)
+})
+
+test('Citizen hides both cards by role while preserving them for other Public-page roles', async () => {
+  const source = await readFile(publicUrl, 'utf8')
+  assert.match(source, /const isCitizen = String\(profile\?\.role \|\| ''\)\.trim\(\)\.toLowerCase\(\) === 'citizen'/)
+  assert.match(source, /const SHOW_CITIZEN_MODEL_EXPLANATION = false/)
+  assert.match(source, /\{!isCitizen \|\| SHOW_CITIZEN_MODEL_EXPLANATION \? \(\s*<section className="border[\s\S]{0,250}Why this model score\?/ )
+  assert.match(source, /const SHOW_CITIZEN_RISK_TREND = false/)
+  assert.match(source, /\{!isCitizen \|\| SHOW_CITIZEN_RISK_TREND \? <section className="citizen-trend[\s\S]{0,500}Historical risk trend is not available\./)
+  assert.match(source, /const SHOW_CITIZEN_RAINFALL_CONTEXT = false/)
+  assert.match(source, /authStatus === 'loading' \|\| \(isCitizen && !SHOW_CITIZEN_RAINFALL_CONTEXT\)/)
+  assert.match(source, /\{!isCitizen \|\| SHOW_CITIZEN_RAINFALL_CONTEXT \? <RainfallDashboard/)
+  assert.match(source, /\{!isCitizen \? \(\s*<section ref=\{alertsRef\}[\s\S]{0,400}Active alerts/)
+  assert.match(source, /const refreshTargetedAlerts = useCallback/)
+  assert.match(source, /apiFetch\('\/alerts\/my'/)
+  assert.match(source, /ref=\{alertControlsRef\} id=\{isCitizen \? 'targeted-alerts' : undefined\}/)
 })
 
 test('elevated warning actions remain gated by the existing in-zone risk state', async () => {

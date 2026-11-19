@@ -420,14 +420,50 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   gap: 1rem;
   align-items: start;
 }
+.citizen-dashboard-grid.citizen-view {
+  grid-template-areas:
+    "location map"
+    "risk map"
+    "environment environment"
+    "metrics safety"
+    "route route"
+    "controls controls";
+  align-items: stretch;
+}
+.citizen-dashboard-grid.community-reports-enhanced:not(.citizen-view) {
+  grid-template-areas:
+    "location map"
+    "risk map"
+    "trend map"
+    "alerts alerts"
+    "reports reports"
+    "environment environment"
+    "metrics safety"
+    "route route"
+    "controls controls";
+}
+.citizen-dashboard-grid.community-reports-enhanced.citizen-view {
+  grid-template-areas:
+    "location map"
+    "risk map"
+    "reports reports"
+    "environment environment"
+    "metrics safety"
+    "route route"
+    "controls controls";
+  align-items: stretch;
+}
 .citizen-workspace, .citizen-context { display: contents; }
 .citizen-location { grid-area: location; }
 .citizen-risk { grid-area: risk; }
 .citizen-map { grid-area: map; border-radius: .5rem; height: 500px; min-height: 0; }
+.citizen-view .citizen-map { display: flex; flex-direction: column; height: auto; min-height: 500px; }
+.citizen-view .citizen-map > .relative { flex: 1 1 auto; min-height: 0; }
 .citizen-safety { grid-area: safety; }
 .citizen-route { grid-area: route; }
 .citizen-controls { grid-area: controls; }
 .citizen-alerts { grid-area: alerts; }
+.citizen-community-reports { grid-area: reports; }
 .citizen-environment { grid-area: environment; }
 .citizen-metrics { grid-area: metrics; }
 .citizen-trend { grid-area: trend; }
@@ -498,7 +534,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "location" "risk" "map" "trend" "alerts" "environment" "metrics" "safety" "route" "controls";
   }
+  .citizen-dashboard-grid.citizen-view {
+    grid-template-areas: "location" "risk" "map" "environment" "metrics" "safety" "route" "controls";
+    align-items: stretch;
+  }
+  .citizen-dashboard-grid.community-reports-enhanced:not(.citizen-view) {
+    grid-template-areas: "location" "risk" "map" "trend" "alerts" "reports" "environment" "metrics" "safety" "route" "controls";
+  }
+  .citizen-dashboard-grid.community-reports-enhanced.citizen-view {
+    grid-template-areas: "location" "risk" "map" "reports" "environment" "metrics" "safety" "route" "controls";
+    align-items: stretch;
+  }
   .citizen-map { height: 440px; min-height: 0; }
+  .citizen-view .citizen-map { height: 440px; min-height: 0; }
 }
 
 @media (max-width: 640px) {
@@ -510,6 +558,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .citizen-nav-link { padding-inline: .5rem; }
   .session-chip { right: .5rem !important; }
   .citizen-map { height: 360px; min-height: 0; }
+  .citizen-view .citizen-map { height: 360px; min-height: 0; }
   .citizen-dashboard-grid { gap: .75rem; }
   .citizen-metrics { grid-template-columns: minmax(0, 1fr) !important; }
   .citizen-metrics > div:first-child { grid-column: 1 / -1; }

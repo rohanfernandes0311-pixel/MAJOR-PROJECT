@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import MapView from '../shared/MapView'
 import RiskCard from '../shared/RiskCard'
+import { CitizenCommunityReports } from '../components/CommunityReports'
+import { COMMUNITY_REPORTS_ENHANCED, reportsVisibleOnCitizenMap } from '../services/communityReportsFeature'
 import EvacuationPanel from '../shared/EvacuationPanel'
 import {
   clearOfflineEmergencyAlert,
@@ -8,6 +10,7 @@ import {
   persistOfflineEmergencyAlert
 } from '../shared/offlineEmergencyAlertStore'
 import { apiFetch, getStoredAuth } from '../auth/authClient'
+import { useAuth } from '../auth/AuthProvider'
 import { AlertNotificationManager, citizenLiveAlerts } from '../services/alertNotificationManager'
 import { INCIDENT_DEMO_EVENT, formatIncidentDate, impactLines, readDemoAlert } from '../services/incidentDemo'
 import { citizenRiskCopy, deriveCitizenGeofenceState, normalizeRisk } from '../services/citizenGeofence'
@@ -16,7 +19,12 @@ import { createCitizenEnvironmentController } from '../services/citizenEnvironme
 import SoilMoistureCard from '../shared/SoilMoistureCard'
 import { createCitizenPrecipitationController } from '../services/citizenPrecipitation'
 import PrecipitationCard from '../shared/PrecipitationCard'
+import RainfallDashboard from '../components/RainfallDashboard'
 import LandSenseLayout from '../components/LandSenseLayout'
+
+const SHOW_CITIZEN_MODEL_EXPLANATION = false
+const SHOW_CITIZEN_RAINFALL_CONTEXT = false
+const SHOW_CITIZEN_RISK_TREND = false
 
 const STORAGE = {
   uid: 'landsense_uid',
@@ -104,6 +112,8 @@ function AlertRiskPill({ risk }) {
 }
 
 export default function Public() {
+  const { profile, status: authStatus } = useAuth()
+  const isCitizen = String(profile?.role || '').trim().toLowerCase() === 'citizen'
   const [status, setStatus] = useState({
     risk: '--',
     confidence: 0,
@@ -114,6 +124,7 @@ export default function Public() {
     alert: 'Safety monitoring is ready'
   })
   const [zones, setZones] = useState([])
+  const [communityReports, setCommunityReports] = useState([])
   const [location, setLocation] = useState(null)
   const [route, setRoute] = useState(null)
   const [destinationText, setDestinationText] = useState('')
@@ -126,6 +137,12 @@ export default function Public() {
   const [soilLoading, setSoilLoading] = useState(false)
   const [precipitationObservation, setPrecipitationObservation] = useState(null)
   const [precipitationLoading, setPrecipitationLoading] = useState(false)
+  const [rainfallTrends, setRainfallTrends] = useState(null)
+  const [rainfallForecast, setRainfallForecast] = useState(null)
+  const [rainfallLoading, setRainfallLoading] = useState(false)
+  const [rainfallError, setRainfallError] = useState(false)
+  const [rainfallPeriod, setRainfallPeriod] = useState('daily')
+  const [rainfallDays, setRainfallDays] = useState(365)
   const [banner, setBanner] = useState({
     tone: 'safe',
     title: 'Safety monitoring is ready',
@@ -135,6 +152,11 @@ export default function Public() {
   const [monitoring, setMonitoring] = useState(false)
   const [alertsEnabled, setAlertsEnabled] = useState(localStorage.getItem(STORAGE.alerts) === '1')
   const [notificationPermission, setNotificationPermission] = useState(currentNotificationPermission)
+  const [modelFeatures, setModelFeatures] = useState(null)
+  const [modelRiskLabel, setModelRiskLabel] = useState(null)
+  const [riskExplanation, setRiskExplanation] = useState(null)
+  const [explanationLoading, setExplanationLoading] = useState(false)
+  const [explanationError, setExplanationError] = useState('')
   const [locationStatus, setLocationStatus] = useState('Location not shared')
   const [statusText, setStatusText] = useState('Ready to protect you.')
   const [lastUpdate, setLastUpdate] = useState(localStorage.getItem(STORAGE.lastUpdated) || 'Waiting')
@@ -154,6 +176,7 @@ export default function Public() {
   const dashboardRef = useRef(null)
   const mapRef = useRef(null)
   const alertsRef = useRef(null)
+  const alertControlsRef = useRef(null)
   const safetyRef = useRef(null)
   const routeRef = useRef(null)
   const alertNotificationManagerRef = useRef(new AlertNotificationManager())
@@ -167,6 +190,21 @@ export default function Public() {
   const weatherControllerRef = useRef(null)
   const environmentControllerRef = useRef(null)
   const precipitationControllerRef = useRef(null)
+
+  const loadCommunityReports = useCallback(async () => {
+    try {
+      const response = await fetchJson(`/community-reports/map?limit=500${COMMUNITY_REPORTS_ENHANCED ? '&verified_only=true' : ''}`)
+      setCommunityReports(reportsVisibleOnCitizenMap(response.reports, COMMUNITY_REPORTS_ENHANCED))
+    } catch {
+      setCommunityReports([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadCommunityReports()
+    const timer = window.setInterval(loadCommunityReports, 180000)
+    return () => window.clearInterval(timer)
+  }, [loadCommunityReports])
 
   useEffect(() => {
     const controller = createCitizenPrecipitationController({
@@ -183,6 +221,31 @@ export default function Public() {
   useEffect(() => {
     precipitationControllerRef.current?.setLocation(location)
   }, [location?.lat, location?.lng])
+
+  useEffect(() => {
+    if (authStatus === 'loading' || (isCitizen && !SHOW_CITIZEN_RAINFALL_CONTEXT) || !location || !Number.isFinite(location.lat) || !Number.isFinite(location.lng)) {
+      setRainfallTrends(null)
+      setRainfallForecast(null)
+      setRainfallLoading(false)
+      return undefined
+    }
+    const controller = new AbortController()
+    const { lat, lng } = location
+    setRainfallLoading(true)
+    setRainfallError(false)
+    setRainfallTrends(null)
+    setRainfallForecast(null)
+    Promise.all([
+      fetchJson(`/citizen/rainfall/trends?latitude=${lat}&longitude=${lng}&days=${rainfallDays}&period=${rainfallPeriod}`, { signal: controller.signal, cache: 'no-store' }),
+      fetchJson(`/citizen/rainfall/forecast?latitude=${lat}&longitude=${lng}`, { signal: controller.signal, cache: 'no-store' }),
+    ]).then(([trends, forecast]) => {
+      setRainfallTrends(trends)
+      setRainfallForecast(forecast)
+    }).catch(() => {
+      if (!controller.signal.aborted) { setRainfallTrends(null); setRainfallForecast(null); setRainfallError(true) }
+    }).finally(() => { if (!controller.signal.aborted) setRainfallLoading(false) })
+    return () => controller.abort()
+  }, [authStatus, isCitizen, location?.lat, location?.lng, rainfallPeriod, rainfallDays])
 
   useEffect(() => {
     const controller = createCitizenEnvironmentController({
@@ -420,6 +483,10 @@ export default function Public() {
       }
 
       const geofence = deriveCitizenGeofenceState(prediction)
+      setModelFeatures(prediction?.prediction?.feature_values || null)
+      setModelRiskLabel(prediction?.prediction?.risk_label || null)
+      setRiskExplanation(null)
+      setExplanationError('')
       const copy = citizenRiskCopy(geofence.uiRisk, geofence.activeZoneName)
       setActiveZoneId(geofence.activeZoneId)
       setStatus((previous) => ({
@@ -480,6 +547,23 @@ export default function Public() {
     }
   }, [alertsEnabled, showLocalAlert, tryPredict])
 
+  const loadRiskExplanation = useCallback(async () => {
+    if (!modelFeatures) return
+    setExplanationLoading(true)
+    setExplanationError('')
+    try {
+      const result = await fetchJson('/predict-risk/explanation', {
+        method: 'POST',
+        body: JSON.stringify({ ...modelFeatures, model: 'ensemble' })
+      })
+      setRiskExplanation(result.explanation)
+    } catch {
+      setExplanationError('The model explanation is unavailable right now.')
+    } finally {
+      setExplanationLoading(false)
+    }
+  }, [modelFeatures])
+
   useEffect(() => {
     evaluatePositionRef.current = evaluatePosition
   }, [evaluatePosition])
@@ -537,7 +621,7 @@ export default function Public() {
       return
     }
 
-    if (!('serviceWorker' in navigator)) {
+    if (!('serviceWorker' in navigator) || import.meta.env.DEV) {
       setStatusText("Browser alerts aren't available on this device. Your inbox will keep working.")
       return
     }
@@ -668,7 +752,7 @@ export default function Public() {
 
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
 
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && !import.meta.env.DEV) {
       let refreshing = false
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (refreshing) return
@@ -682,6 +766,12 @@ export default function Public() {
         .catch(() => {
           // Keep app running when SW registration fails.
         })
+    } else if ('serviceWorker' in navigator && import.meta.env.DEV) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        registrations.forEach((registration) => registration.unregister())
+      }).catch(() => {
+        // Keep development requests on the normal browser network path.
+      })
     }
 
     const cached = loadOfflineEmergencyAlert()
@@ -737,7 +827,6 @@ export default function Public() {
     const risk = normalizeRisk(alert?.risk_level)
     return risk === 'HIGH' || risk === 'CRITICAL'
   })
-
   const dismissOfflineEmergency = useCallback(() => {
     clearOfflineEmergencyAlert()
     setOfflineEmergency(null)
@@ -762,7 +851,7 @@ export default function Public() {
   const navigation = [
     { id: 'dashboard', label: 'Dashboard', onClick: () => scrollToSection(dashboardRef), active: true },
     { id: 'map', label: 'Map', onClick: () => scrollToSection(mapRef) },
-    { id: 'alerts', label: 'Alerts', onClick: () => scrollToSection(alertsRef) },
+    { id: 'alerts', label: 'Alerts', onClick: () => scrollToSection(isCitizen ? alertControlsRef : alertsRef) },
     { id: 'safety', label: 'Safety', onClick: () => scrollToSection(safetyRef) }
   ]
 
@@ -853,7 +942,7 @@ export default function Public() {
           </div>
 
           <div className="citizen-dashboard-container mx-auto max-w-screen-xl">
-            <div className="citizen-dashboard-grid">
+            <div className={`citizen-dashboard-grid ${isCitizen ? 'citizen-view' : ''} ${COMMUNITY_REPORTS_ENHANCED ? 'community-reports-enhanced' : ''}`}>
             <header className="citizen-location">
               <div className="border-b border-[#dfe5df] bg-white px-4 py-4">
                 <div className="flex items-start justify-between gap-4">
@@ -889,12 +978,33 @@ export default function Public() {
               <div className="citizen-context">
                 <div className="citizen-risk"><RiskCard risk={status.risk} confidence={status.confidence} rainfall={status.rainfall} recommendation={status.recommendation} updated={lastUpdate} /></div>
 
-                <section className="citizen-trend border border-[#dfe5df] bg-white p-4" aria-labelledby="citizen-risk-trend-title">
+                {!isCitizen || SHOW_CITIZEN_MODEL_EXPLANATION ? (
+                <section className="border border-[#dfe5df] bg-white p-4" aria-label="Why the model gave this risk score">
+                  <div className="section-kicker">Why this model score?</div>
+                  <p className="mt-1 text-xs text-slate-600">See which inputs moved the model scores compared with its reference conditions.</p>
+                  <button type="button" disabled={!modelFeatures || explanationLoading} onClick={loadRiskExplanation} className="mt-3 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50">
+                    {explanationLoading ? 'Explaining…' : riskExplanation ? 'Refresh explanation' : 'Explain this assessment'}
+                  </button>
+                  {explanationError ? <p role="status" className="mt-2 text-xs text-rose-700">{explanationError}</p> : null}
+                  {riskExplanation ? <>
+                    <p className="mt-3 text-xs text-slate-700">For the <strong>{riskExplanation.model_used}</strong>, inputs below show how the model score for <strong>{modelRiskLabel}</strong> shifted from the reference conditions. Positive values increase that score; negative values decrease it.</p>
+                    <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                      {Object.entries(riskExplanation.contributions || {}).map(([feature, values]) => [feature, Number(values[modelRiskLabel] || 0)])
+                        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 4)
+                        .map(([feature, value]) => <li key={feature} className="flex justify-between gap-3"><span>{feature.replaceAll('_', ' ')}</span><strong>{value >= 0 ? '+' : ''}{(value * 100).toFixed(1)} percentage points</strong></li>)}
+                    </ul>
+                    <p className="mt-2 text-[11px] text-slate-500">These are model comparisons, not causes or calibrated real-world probabilities. The model uses a fixed aspect value of 180°.</p>
+                  </> : null}
+                </section>
+                ) : null}
+
+                {!isCitizen || SHOW_CITIZEN_RISK_TREND ? <section className="citizen-trend border border-[#dfe5df] bg-white p-4" aria-labelledby="citizen-risk-trend-title">
                   <div className="section-kicker">Risk trend</div>
                   <h2 id="citizen-risk-trend-title" className="mt-1 text-sm font-semibold text-slate-900">Historical risk trend is not available.</h2>
                   <p className="mt-1 text-xs text-slate-500">The current assessment is shown without fabricating historical readings.</p>
-                </section>
+                </section> : null}
 
+                {!isCitizen ? (
                 <section ref={alertsRef} id="targeted-alerts" className={`citizen-alerts scroll-mt-16 border bg-white p-4 ${elevatedRisk && relevantTargetedAlerts.length ? 'border-red-300/70 shadow-lg shadow-red-900/10' : 'border-[#dfe5df]'}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -907,12 +1017,13 @@ export default function Public() {
                     </div>
                   </div>
                   {alertInboxState === 'loading' ? <p className="mt-3 text-sm text-slate-400">Loading targeted alerts…</p> : null}
-                  {/* Legacy incident label covered by regression: ðŸš¨ LANDSLIDE ALERT */}
+                  {/* Legacy incident label covered by regression: 🚨 LANDSLIDE ALERT */}
                   {demoAlert ? <div className="mt-3 rounded-xl border border-red-300/30 bg-red-500/10 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div className="text-sm font-black tracking-wide text-red-100">{demoAlert.offline_demo ? '🚨 LANDSLIDE EMERGENCY' : '🚨 LANDSLIDE ALERT'}</div><AlertRiskPill risk={demoAlert.demo_risk} /></div><h3 className="mt-3 text-lg font-bold">{demoAlert.title}</h3><p className="mt-1 text-sm">📍 {demoAlert.location_name}, {demoAlert.district}</p>{demoAlert.location_precision === 'approximate' ? <p className="mt-1 text-xs text-slate-400">Approximate incident location</p> : null}<p className="mt-1 text-sm">📅 {formatIncidentDate(demoAlert.date)}</p><p className="mt-3 text-sm text-slate-100">{demoAlert.short_description}</p><div className="mt-3 flex flex-wrap gap-2">{impactLines(demoAlert).map((line) => <span key={line} className="rounded-full border border-white/15 px-2.5 py-1 text-xs">{line}</span>)}</div><p className="mt-3 text-sm font-semibold text-amber-100">⚠️ {demoAlert.safety_guidance}</p><p className="mt-3 text-xs font-black tracking-[0.16em] text-red-200">{demoAlert.offline_demo ? '🧪 OFFLINE DEMO · NO REAL MESSAGE WAS SENT' : 'SIMULATION — NOT A LIVE ALERT'}</p></div> : null}
                   {alertInboxState === 'ready' && !targetedAlerts.length && !demoAlert ? <p className="mt-3 rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-slate-400">No targeted alerts</p> : null}
                   {alertInboxState === 'ready' && targetedAlerts.length ? <div className="mt-3 space-y-2">{targetedAlerts.map((alert, index) => <div key={alert.id ?? `${alert.timestamp}-${index}`} className="rounded-xl border border-white/8 bg-black/20 p-3"><div className="flex items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><AlertRiskPill risk={alert.risk_level} />{String(alert.source_type || '').toUpperCase().includes('SIMULATION') ? <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-1 text-[10px] font-bold tracking-wide text-amber-100">SIMULATION — NOT A LIVE ALERT</span> : null}</div><span className="text-xs text-slate-400">{alert.timestamp ? new Date(alert.timestamp).toLocaleString() : ''}</span></div><p className="mt-2 text-sm text-slate-100">{alert.message}</p></div>)}</div> : null}
                   {alertInboxState === 'unavailable' ? <p className="mt-3 text-sm text-slate-400">Targeted alerts are unavailable right now.</p> : null}
                 </section>
+                ) : null}
 
                 {routeGuidanceAvailable ? (
                 <div ref={routeRef} className="citizen-route scroll-mt-16">
@@ -942,16 +1053,18 @@ export default function Public() {
                   </div>
                 </section>
 
-                <section className="citizen-controls border border-[#dfe5df] bg-white p-4">
+                {!isCitizen || SHOW_CITIZEN_RAINFALL_CONTEXT ? <RainfallDashboard trends={rainfallTrends} forecast={rainfallForecast} loading={rainfallLoading} error={rainfallError} period={rainfallPeriod} onPeriodChange={setRainfallPeriod} days={rainfallDays} onDaysChange={setRainfallDays} /> : null}
+
+                <section ref={alertControlsRef} id={isCitizen ? 'targeted-alerts' : undefined} className="citizen-controls border border-[#dfe5df] bg-white p-4">
                   <div className="mb-3">
                     <div className="text-sm font-semibold">Browser alert permission</div>
                     <p className="mt-1 text-xs text-slate-400">
                       {notificationPermission === 'granted'
                         ? 'Granted — newly targeted alerts can appear as browser notifications.'
                         : notificationPermission === 'denied'
-                          ? 'Denied — allow notifications in browser settings to opt in. Your inbox still works.'
+                          ? `Denied — allow notifications in browser settings to opt in. ${isCitizen ? 'Targeted alerts continue to be checked while this dashboard is open.' : 'Your inbox still works.'}`
                           : notificationPermission === 'unsupported'
-                            ? 'Not supported on this browser. Your inbox still works.'
+                            ? `Not supported on this browser. ${isCitizen ? 'Targeted alerts continue to be checked while this dashboard is open.' : 'Your inbox still works.'}`
                             : 'Optional — enable browser alerts to receive newly targeted warnings while this dashboard is open.'}
                     </p>
                   </div>
@@ -998,8 +1111,9 @@ export default function Public() {
                 </section>
               </div>
 
+              <CitizenCommunityReports location={location} onSubmitted={loadCommunityReports} />
               <section ref={mapRef} aria-label="Landslide risk map" className="citizen-map relative scroll-mt-16 min-h-[520px] overflow-hidden border border-[#cfd8d1] bg-white">
-                <MapView zones={zones} userLocation={location} userLocationStatus={locationStatus} selectedZone={zones.find((zone) => String(zone?.properties?.zone_id || '') === activeZoneId) || null} route={route} risk={status.risk === 'CRITICAL RISK' ? 'CRITICAL' : status.risk === 'HIGH RISK' ? 'HIGH' : status.risk === 'MEDIUM RISK' ? 'MEDIUM' : 'SAFE'} landslideRecords={landslideRecords} />
+                <MapView zones={zones} userLocation={location} userLocationStatus={locationStatus} selectedZone={zones.find((zone) => String(zone?.properties?.zone_id || '') === activeZoneId) || null} route={route} risk={status.risk === 'CRITICAL RISK' ? 'CRITICAL' : status.risk === 'HIGH RISK' ? 'HIGH' : status.risk === 'MEDIUM RISK' ? 'MEDIUM' : 'SAFE'} landslideRecords={landslideRecords} communityReports={communityReports} showCommunityVerifiedReports={COMMUNITY_REPORTS_ENHANCED} />
                 <div className="pointer-events-none absolute right-3 top-3 z-[510] rounded-md border border-slate-200 bg-white/95 px-3 py-2 shadow-sm">
                   <div className="section-kicker">Risk map</div>
                   <div className="text-xs font-medium text-slate-700">Configured zones and current position</div>
