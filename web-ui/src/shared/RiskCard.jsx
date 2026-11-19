@@ -19,10 +19,10 @@ export default function RiskCard({ risk = 'SAFE', confidence = 0.9, rainfall = 0
         <div className="mt-1 text-sm font-medium text-slate-700">{config.label}</div>
         <div className="mt-1 text-sm text-slate-500">{config.advice || recommendation}</div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
-          <div>Confidence <strong className="text-slate-700">{Math.round(confidence * 100)}%</strong></div>
+          <div>Model score <strong className="text-slate-700">{Math.round(confidence * 100)}%</strong></div>
           <div>Rainfall <strong className="text-slate-700">{rainfall} mm</strong></div>
         </div>
-        <div className="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Risk assessment · Updated {updated}</div>
+        <div className="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Model score is not a calibrated real-world probability · Updated {updated}</div>
       </div>
     </section>
   )
