@@ -1,5 +1,96 @@
 # Location-Based Landslide Alert System using Geo-Fencing and Machine Learning
 
+## Current setup and operations
+
+LANDsense is a monitoring aid. It is not an official emergency-alert service. Simulation messages and exports are demonstration material only; they must not be treated as real warnings or dispatched as live alerts.
+
+### Requirements and setup
+
+- Python 3.11 or later and Node.js/npm.
+- A PostgreSQL/Neon database URL for backend persistence. Use a Neon branch for development and migration checks.
+- Optional provider credentials as documented in `.env.example`; never put private credentials in a `VITE_` variable.
+
+From the repository root, create and activate a virtual environment, then install the backend dependencies:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt pytest
+Copy-Item .env.example .env
+```
+
+On macOS/Linux, activate with `source .venv/bin/activate` instead. Edit `.env` with a Neon branch `DATABASE_URL`, a private `JWT_SECRET` of at least 32 bytes, and any optional provider settings you need. Never commit `.env` or service-account credentials. `config/firebase-service-account.json` is read by the backend Firebase Admin SDK and must remain private.
+
+The root `.env.example` documents backend settings and all discovered frontend build variables. Copy `web-ui/.env.example` to `web-ui/.env` for Vite; Firebase `VITE_` values are browser-visible configuration, not secrets. `CORS_ALLOWED_ORIGINS` accepts explicit comma-separated origins. The development defaults are `http://localhost:5173` and `http://127.0.0.1:5173`; configure the deployed frontend's exact HTTPS origin in production.
+
+Backend configuration includes `DATABASE_URL`, `JWT_SECRET`, `JWT_ALGO`, `ENVIRONMENT`/`APP_ENV`, token and OTP limits, `CORS_ALLOWED_ORIGINS`, and optional SMS, weather, Earthdata, mesh, extraction, and Copernicus settings. Frontend configuration includes `VITE_API_BASE_URL`, the six `VITE_FIREBASE_*` client settings, `VITE_COMMUNITY_REPORTS_ENHANCED`, and `VITE_SIMULATION_MESSAGE_LANGUAGE`. Each variable has a placeholder and comment in the relevant example file. `import.meta.env.DEV` is a Vite-provided build constant, not a user-configured variable.
+
+For production, set `CORS_ALLOWED_ORIGINS` to the exact comma-separated HTTPS origin(s) serving the frontend, for example `https://app.example.org`. Do not use `*`; backend startup rejects wildcard configuration. CORS permits the app's `GET`, `POST`, and `OPTIONS` methods and `Authorization`/`Content-Type` headers. The frontend uses bearer authorization for authenticated resource requests; `/auth/refresh` sends its refresh token in a JSON body. The app does not use cookies for API authentication.
+
+### Run the application
+
+Start the backend from the repository root:
+
+```powershell
+uvicorn backend_api:app --host 127.0.0.1 --port 8000 --reload
+```
+
+In another terminal, install and start the frontend:
+
+```powershell
+cd web-ui
+npm install
+npm run dev
+```
+
+The Vite development proxy targets `http://127.0.0.1:8000` unless `VITE_API_BASE_URL` overrides it. To create a production frontend bundle, run `npm run build` in `web-ui`.
+
+### Database migration
+
+Create a disposable Neon branch and point `DATABASE_URL` to that branch before migrating. From the repository root with the virtual environment active, run:
+
+```powershell
+python -m database.migrate_add_community_reports
+```
+
+This creates the additive community-report tables/columns. Verify it on the branch before applying it to any other environment. Do not use a production URL for routine migration checks.
+
+### Tests
+
+From the repository root:
+
+```powershell
+python -m pytest -q
+```
+
+From `web-ui`:
+
+```powershell
+npm test
+```
+
+The backend tests use isolated fixtures/mocks where provided. Do not point tests at production data.
+
+### Roles and feature flags
+
+- **Citizen** accounts use the citizen monitoring and community-report flows.
+- **Admin** accounts can access administrative review, simulation, and operational tools; backend routes enforce administrator authorization.
+- Unauthenticated visitors can access only the routes explicitly designated public.
+- `VITE_COMMUNITY_REPORTS_ENHANCED=false` restores the earlier community-report form and map behavior.
+- `VITE_SIMULATION_MESSAGE_LANGUAGE=false` disables Kannada/bilingual simulation message templates. Simulation output remains demonstration-only.
+
+The FastAPI backend owns authentication, report review, persistence, provider integrations, and administrative APIs. The React/Vite frontend provides citizen/admin screens, maps, and PWA assets. PostgreSQL/Neon is the runtime database; SQLite files are migration or test artifacts.
+
+### Downloading terrain tiles
+
+The SRTM tile URLs and expected SHA-256 digests are listed in `data/research/south_india_environmental_features/terrain_manifest.json`. Install backend requirements, then run:
+
+```powershell
+python scripts/download_srtm_tiles.py
+```
+
+The script downloads only manifest-listed HTTPS tiles, verifies each digest, and atomically replaces a tile only after verification. Correctly verified local tiles are skipped. The compressed `.hgt.gz` files are local research inputs and are ignored by Git; keep the small manifest and derived, reviewable data under version control as appropriate.
+
 End-to-end lightweight major-project prototype for Indian regions.
 
 This repository now supports both:
@@ -223,34 +314,9 @@ Browser-local emergency persistence is implemented via a dedicated utility modul
 
 This keeps emergency visibility resilient during connectivity loss without changing backend APIs.
 
-## Secure Auth + Alert APIs
+## Auth and alert APIs
 
-(Removed) Interactive login flows and related endpoints.
-
-## Auth + Security Environment Variables
-
-```bash
-set JWT_SECRET=replace_with_long_random_secret
-set JWT_ALGO=HS256
-set ACCESS_TOKEN_TTL_MIN=15
-set REFRESH_TOKEN_TTL_DAYS=7
-set PHONE_HASH_SALT=replace_with_random_salt
-set RECAPTCHA_SECRET_KEY=your_recaptcha_secret
-set ENFORCE_HTTPS=true
-set ALLOW_INSECURE_LOCALHOST=true
-
-set TWILIO_ACCOUNT_SID=...
-set TWILIO_AUTH_TOKEN=...
-set TWILIO_SMS_FROM=+1XXXXXXXXXX
-```
-
-Notes:
-
- - Alert SMS messages are sent when Twilio is configured; otherwise they are simulated and logged.
-
-See secure architecture and schema details in:
-
-- (Removed) Secure-auth architecture document.
+Interactive auth, OTP, session, and alert APIs are implemented in the backend. See the current setup section above for role behavior and the complete environment-variable examples. Keep all provider credentials server-side; never use a `VITE_` prefix for a private value.
 
 ## Sample Alert Message
 
