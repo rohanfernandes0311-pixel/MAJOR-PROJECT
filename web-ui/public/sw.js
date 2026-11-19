@@ -2,6 +2,13 @@ const CACHE_VERSION = 'v2'
 const CACHE_NAME = `landsense-web-ui-${CACHE_VERSION}`
 
 const APP_SHELL = ['/', '/manifest.json']
+const API_PATH_PREFIXES = [
+  '/api', '/auth', '/community-reports', '/send-otp', '/verify-otp', '/profile',
+  '/logout', '/zones', '/alerts', '/landslides', '/landslide-extraction', '/events', '/predict',
+  '/predict-risk', '/location-update', '/route-safe', '/subscribe', '/admin',
+  '/citizen/weather', '/citizen/environment', '/citizen/rainfall',
+  '/vapid-public-key', '/push-public-key', '/public-key', '/vapidPublicKey', '/health',
+]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -29,12 +36,11 @@ self.addEventListener('fetch', (event) => {
 
   if (url.origin !== self.location.origin) return
 
-  // Never cache authenticated API responses. In particular, /alerts/my is
-  // scoped by the bearer token even though every citizen uses the same URL.
-  if (url.pathname.startsWith('/alerts/') || req.headers.has('Authorization')) {
-    event.respondWith(fetch(req))
-    return
-  }
+  // Keep every proxied API path on the browser's normal network path. The
+  // exact /admin navigation is the SPA shell; nested /admin routes are APIs.
+  const isAdminShellNavigation = req.mode === 'navigate' && url.pathname === '/admin'
+  const isApiPath = API_PATH_PREFIXES.some((path) => url.pathname === path || url.pathname.startsWith(`${path}/`))
+  if (req.method !== 'GET' || req.headers.has('Authorization') || (isApiPath && !isAdminShellNavigation)) return
 
   if (req.mode === 'navigate') {
     event.respondWith(
