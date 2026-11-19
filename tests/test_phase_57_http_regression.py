@@ -149,6 +149,22 @@ class Phase57HttpRegressionTests(unittest.TestCase):
         self.assertTrue(profile.json()["authenticated"])
         self.assertEqual(admin.status_code, 200)
 
+    def test_risk_explanation_endpoint_requires_auth_and_accepts_exact_vector(self):
+        body = {
+            "deformation_mm": 5, "velocity_mm_yr": 12, "coherence": .8,
+            "rainfall_mm": 18, "slope_deg": 24, "soil_moisture_pct": 45,
+            "elevation_m": 900, "aspect_deg": 180, "ndvi": .4,
+            "model": "ensemble",
+        }
+        expected = {"method": "test"}
+        with patch.object(backend_api, "explain_prediction", return_value=expected) as explain:
+            response = self.client.post("/predict-risk/explanation", headers=self.auth, json=body)
+            unauthenticated = self.client.post("/predict-risk/explanation", json=body)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"explanation": expected})
+        self.assertEqual(unauthenticated.status_code, 401)
+        self.assertEqual(explain.call_args.args[0]["aspect_deg"], 180)
+
 
 if __name__ == "__main__":
     unittest.main()

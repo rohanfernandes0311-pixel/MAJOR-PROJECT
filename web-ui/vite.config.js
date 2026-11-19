@@ -6,6 +6,8 @@ import react from '@vitejs/plugin-react'
 const backendTarget = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 const proxiedPaths = [
   '/auth',
+  '/api',
+  '/community-reports',
   '/send-otp',
   '/verify-otp',
   '/profile',
@@ -22,6 +24,7 @@ const proxiedPaths = [
   '/admin',
   '/citizen/weather',
   '/citizen/environment',
+  '/citizen/rainfall',
   '/vapid-public-key',
   '/push-public-key',
   '/public-key',

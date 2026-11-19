@@ -12,7 +12,9 @@ from __future__ import annotations
 import re
 import os
 import hashlib
+import logging
 import math
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -21,6 +23,7 @@ import requests
 from backend.auth.router import router as auth_router
 from backend.citizen_weather import router as citizen_weather_router
 from backend.citizen_environment import router as citizen_environment_router
+from backend.citizen_rainfall import router as citizen_rainfall_router
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -51,7 +54,10 @@ from local_store import (
     upsert_user,
 )
 from database.connection import SessionLocal, engine, get_db
-from database.models import Alert, AuditEvent, LandslideInventory, Location, LocationEvent, User
+from database.models import (
+    Alert, AuditEvent, CommunityReport, CommunityReportReview, LandslideInventory,
+    Location, LocationEvent, User,
+)
 from geofencing import (
     detect_fence_event,
     find_zone_matches,
@@ -60,7 +66,7 @@ from geofencing import (
     primary_zone_id,
     point_in_polygon,
 )
-from predict import predict
+from predict import predict, explain_prediction
 from route_planner import plan_safe_route
 from sms_service import send_sms_alert, sms_configuration_status
 from services.extension_loader import ExtensionLoader
@@ -71,6 +77,8 @@ from services.phase6_intelligence import (
     load_incident_catalog,
     polygon_centroid,
 )
+
+logger = logging.getLogger(__name__)
 from services.simulation_mode_service import KODAGU_LOCATIONS, SimulationModeService
 from services.simulation_demonstration import router as simulation_demonstration_router
 from services.audit_service import public_audit_event, try_record_audit_event
@@ -117,13 +125,25 @@ app.include_router(landslide_extraction_router)
 app.include_router(simulation_demonstration_router)
 app.include_router(citizen_weather_router)
 app.include_router(citizen_environment_router)
+app.include_router(citizen_rainfall_router)
+
+
+def _cors_allowed_origins() -> list[str]:
+    configured = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    if not configured.strip():
+        return ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+    origins = list(dict.fromkeys(origin.strip() for origin in configured.split(",") if origin.strip()))
+    if "*" in origins:
+        raise RuntimeError("CORS_ALLOWED_ORIGINS must use explicit origins; '*' is not allowed")
+    return origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_allowed_origins(),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 def _web_ui_asset(path: str, media_type: str | None = None) -> FileResponse:
@@ -182,6 +202,32 @@ class PredictRequest(BaseModel):
     elevation_m: float = Field(900.0, allow_inf_nan=False)
     ndvi: float = Field(0.4, ge=-1, le=1, allow_inf_nan=False)
     model: Literal["random_forest", "xgboost", "ensemble"] = "ensemble"
+
+
+class RiskExplanationRequest(BaseModel):
+    deformation_mm: float = Field(..., allow_inf_nan=False)
+    velocity_mm_yr: float = Field(..., allow_inf_nan=False)
+    coherence: float = Field(..., ge=0, le=1, allow_inf_nan=False)
+    rainfall_mm: float = Field(..., allow_inf_nan=False)
+    slope_deg: float = Field(..., ge=0, le=90, allow_inf_nan=False)
+    soil_moisture_pct: float = Field(..., ge=0, le=100, allow_inf_nan=False)
+    elevation_m: float = Field(..., allow_inf_nan=False)
+    aspect_deg: float = Field(..., ge=0, le=360, allow_inf_nan=False)
+    ndvi: float = Field(..., ge=-1, le=1, allow_inf_nan=False)
+    model: Literal["random_forest", "xgboost", "ensemble"] = "ensemble"
+
+
+class CommunityReportRequest(BaseModel):
+    category: Literal["landslide", "road_blockage", "rockfall", "soil_erosion", "ground_cracks", "other"]
+    description: str = Field(..., min_length=1, max_length=2000)
+    latitude: float = Field(..., ge=-90, le=90, allow_inf_nan=False)
+    longitude: float = Field(..., ge=-180, le=180, allow_inf_nan=False)
+    place_name: str | None = Field(default=None, max_length=250)
+
+
+class CommunityReportReviewRequest(BaseModel):
+    status: Literal["under_review", "verified", "rejected"]
+    review_note: str | None = Field(default=None, max_length=1000)
 
 
 class AlertSubscriptionRequest(BaseModel):
@@ -813,6 +859,229 @@ def landslide_inventory(
             for item in records
         ],
     }
+
+
+COMMUNITY_REPORT_CATEGORIES = {
+    "landslide", "road_blockage", "rockfall", "soil_erosion", "ground_cracks", "other",
+}
+COMMUNITY_REPORT_STATUSES = {"pending", "under_review", "verified", "rejected"}
+
+
+def _community_report_payload(report: CommunityReport) -> dict[str, Any]:
+    return {
+        "id": report.id,
+        "category": report.category,
+        "description": report.description,
+        "latitude": report.latitude,
+        "longitude": report.longitude,
+        "submitted_at": report.submitted_at.isoformat() if report.submitted_at else None,
+        "status": report.status,
+        "reviewed_at": report.reviewed_at.isoformat() if report.reviewed_at else None,
+    }
+
+
+def _community_report_history(db: Session, report_id: str) -> list[dict[str, Any]]:
+    rows = db.scalars(
+        select(CommunityReportReview)
+        .where(CommunityReportReview.report_id == report_id)
+        .order_by(CommunityReportReview.changed_at, CommunityReportReview.id)
+    ).all()
+    return [{
+        "from_status": item.from_status,
+        "to_status": item.to_status,
+        "actor_uid": item.actor_uid,
+        "actor_role": item.actor_role,
+        "review_note": item.review_note,
+        "changed_at": item.changed_at.isoformat() if item.changed_at else None,
+    } for item in rows]
+
+
+@app.post("/community-reports", status_code=201)
+def submit_community_report(
+    req: CommunityReportRequest,
+    payload: dict = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    reporter_uid = str(payload.get("sub", "")).strip()
+    if not reporter_uid:
+        raise HTTPException(status_code=401, detail="Invalid authenticated user")
+    description = req.description.strip()
+    if not description:
+        raise HTTPException(status_code=422, detail="Description must not be blank")
+    place_name = req.place_name.strip() if req.place_name is not None else None
+    if req.place_name is not None and not place_name:
+        raise HTTPException(status_code=422, detail="Place name must not be blank")
+    if place_name and not (11.5 <= req.latitude <= 18.5 and 74.0 <= req.longitude <= 78.6):
+        raise HTTPException(status_code=422, detail="Report location must be within Karnataka, India")
+
+    now = datetime.now(timezone.utc)
+    try:
+        recent = db.scalars(
+            select(CommunityReport)
+            .where(
+                CommunityReport.reporter_uid == reporter_uid,
+                CommunityReport.submitted_at >= now - timedelta(hours=1),
+            )
+            .order_by(CommunityReport.submitted_at.desc())
+            .limit(20)
+        ).all()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Community report duplicate check failed")
+        raise HTTPException(status_code=500, detail="Unable to process report right now") from exc
+    if len(recent) >= 5:
+        raise HTTPException(status_code=429, detail="Report limit reached. Try again later.")
+    for existing in recent:
+        if existing.category != req.category:
+            continue
+        lat1, lat2 = math.radians(existing.latitude), math.radians(req.latitude)
+        dlat = lat2 - lat1
+        dlon = math.radians(req.longitude - existing.longitude)
+        distance = 6371000 * 2 * math.asin(math.sqrt(
+            math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        ))
+        submitted_at = existing.submitted_at
+        if submitted_at.tzinfo is None:
+            submitted_at = submitted_at.replace(tzinfo=timezone.utc)
+        if distance < 50 and (now - submitted_at.astimezone(timezone.utc)).total_seconds() < 600:
+            raise HTTPException(status_code=409, detail="A similar report was recently submitted from this location")
+
+    report = CommunityReport(
+        id=str(uuid.uuid4()), reporter_uid=reporter_uid, reporter_id=reporter_uid,
+        reporter_role="citizen", category=req.category, description=description,
+        place_name=place_name, latitude=req.latitude, longitude=req.longitude,
+        submitted_at=now, status="pending",
+    )
+    db.add(report)
+    db.add(CommunityReportReview(
+        report_id=report.id, from_status=None, to_status="pending",
+        actor_uid=reporter_uid, actor_role="citizen", review_note=None, changed_at=now,
+    ))
+    try:
+        db.commit()
+        db.refresh(report)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        logger.exception("Community report save failed")
+        raise HTTPException(status_code=500, detail="Unable to save report right now") from exc
+    return {"report": _community_report_payload(report)}
+
+
+@app.get("/community-reports/mine")
+def my_community_reports(
+    limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0, le=100000),
+    payload: dict = Depends(require_auth), db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    reporter_uid = str(payload.get("sub", "")).strip()
+    if not reporter_uid:
+        raise HTTPException(status_code=401, detail="Invalid authenticated user")
+    filters = [CommunityReport.reporter_uid == reporter_uid]
+    total = int(db.scalar(select(func.count()).select_from(CommunityReport).where(*filters)) or 0)
+    reports = db.scalars(
+        select(CommunityReport).where(*filters)
+        .order_by(CommunityReport.submitted_at.desc(), CommunityReport.id)
+        .offset(offset).limit(limit)
+    ).all()
+    return {"reports": [_community_report_payload(item) for item in reports], "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/community-reports/mine/{report_id}")
+def my_community_report(
+    report_id: str, payload: dict = Depends(require_auth), db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    report = db.get(CommunityReport, report_id)
+    if not report or report.reporter_uid != str(payload.get("sub", "")):
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"report": _community_report_payload(report)}
+
+
+@app.get("/community-reports/map")
+def community_reports_map(
+    limit: int = Query(500, ge=1, le=1000), verified_only: bool = Query(False),
+    payload: dict = Depends(require_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    _ = payload
+    filters = [CommunityReport.status != "rejected"]
+    if verified_only:
+        filters.append(CommunityReport.status == "verified")
+    reports = db.scalars(
+        select(CommunityReport).where(*filters)
+        .order_by(CommunityReport.submitted_at.desc()).limit(limit)
+    ).all()
+    # Citizen map markers are approximate and contain no report text or reporter identity.
+    return {"reports": [{
+        "id": item.id, "category": item.category, "status": item.status,
+        "latitude": round(item.latitude, 3), "longitude": round(item.longitude, 3),
+        "submitted_at": item.submitted_at.isoformat() if item.submitted_at else None,
+    } for item in reports]}
+
+
+@app.get("/admin/community-reports")
+def admin_community_reports(
+    status: str | None = None, category: str | None = None,
+    limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0, le=100000),
+    _: dict = Depends(require_admin), db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    filters = []
+    if status:
+        if status not in COMMUNITY_REPORT_STATUSES:
+            raise HTTPException(status_code=422, detail="Invalid report status")
+        filters.append(CommunityReport.status == status)
+    if category:
+        if category not in COMMUNITY_REPORT_CATEGORIES:
+            raise HTTPException(status_code=422, detail="Invalid report category")
+        filters.append(CommunityReport.category == category)
+    total = int(db.scalar(select(func.count()).select_from(CommunityReport).where(*filters)) or 0)
+    reports = db.scalars(
+        select(CommunityReport).where(*filters)
+        .order_by(CommunityReport.submitted_at.desc(), CommunityReport.id)
+        .offset(offset).limit(limit)
+    ).all()
+    return {"reports": [_community_report_payload(item) for item in reports], "total": total, "limit": limit, "offset": offset}
+
+
+@app.get("/admin/community-reports/{report_id}")
+def admin_community_report_detail(
+    report_id: str, _: dict = Depends(require_admin), db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    report = db.get(CommunityReport, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"report": _community_report_payload(report), "history": _community_report_history(db, report_id)}
+
+
+@app.post("/admin/community-reports/{report_id}/review")
+def review_community_report(
+    report_id: str, req: CommunityReportReviewRequest,
+    payload: dict = Depends(require_admin), db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    report = db.get(CommunityReport, report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    allowed = {"pending": {"under_review", "verified", "rejected"}, "under_review": {"verified", "rejected"}}
+    if req.status not in allowed.get(report.status, set()):
+        raise HTTPException(status_code=409, detail="Report cannot transition from its current status")
+    reviewer_uid = str(payload.get("sub", "")).strip()
+    if not reviewer_uid:
+        raise HTTPException(status_code=401, detail="Invalid administrator session")
+    now = datetime.now(timezone.utc)
+    old_status = report.status
+    report.status = req.status
+    report.reviewed_by_uid = reviewer_uid
+    report.reviewed_at = now
+    review_note = req.review_note.strip() if req.review_note and req.review_note.strip() else None
+    db.add(CommunityReportReview(
+        report_id=report.id, from_status=old_status, to_status=req.status,
+        actor_uid=reviewer_uid, actor_role="admin", review_note=review_note, changed_at=now,
+    ))
+    try:
+        db.commit()
+        db.refresh(report)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Unable to save review right now") from exc
+    return {"report": _community_report_payload(report), "history": _community_report_history(db, report_id)}
 
 
 @app.get("/events")
@@ -2103,6 +2372,19 @@ def predict_risk(req: PredictRequest, _: dict = Depends(require_auth)) -> dict[s
         "zone_matches": [m.__dict__ for m in matches],
         "evacuation": evacuation,
     }
+
+
+@app.post("/predict-risk/explanation")
+def explain_risk(req: RiskExplanationRequest, _: dict = Depends(require_auth)) -> dict[str, Any]:
+    """Explain a supplied model input vector without changing prediction APIs."""
+    features = {name: getattr(req, name) for name in (
+        "deformation_mm", "velocity_mm_yr", "coherence", "rainfall_mm",
+        "slope_deg", "soil_moisture_pct", "elevation_m", "aspect_deg", "ndvi",
+    )}
+    try:
+        return {"explanation": explain_prediction(features, req.model)}
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422 if isinstance(exc, ValueError) else 503, detail=str(exc)) from exc
 
 
 @app.post("/location-update")
