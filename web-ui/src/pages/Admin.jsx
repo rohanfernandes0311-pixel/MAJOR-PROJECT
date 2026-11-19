@@ -12,6 +12,7 @@ import PrecipitationCard from '../shared/PrecipitationCard'
 import AdminAuditTimeline from '../components/AdminAuditTimeline'
 import AdminOfflineAlertDemo from '../components/AdminOfflineAlertDemo'
 import AdminKodaguSimulation from '../components/AdminKodaguSimulation'
+import { AdminCommunityReports } from '../components/CommunityReports'
 import LandSenseLayout from '../components/LandSenseLayout'
 
 const RISK_ORDER = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
@@ -646,6 +647,8 @@ export default function Admin() {
             <div className="mt-5 border-t border-white/8 pt-4"><h3 className="text-sm font-semibold">System status</h3>{Object.entries(data.stats?.system || {}).map(([name, status]) => <div className="mt-3 flex items-center justify-between text-sm" key={name}><span className="capitalize text-slate-400">{name}</span><span style={{ visibility: ['operational', 'connected', 'jwt enabled'].includes(String(status).replace('-', ' ')) ? 'hidden' : undefined }} className="text-emerald-200">{String(status).replace('-', ' ')}</span></div>)}</div>
           </div>
         </section>
+
+        <AdminCommunityReports token={token} />
 
         <section className="grid gap-5 xl:grid-cols-2">
           <div id="admin-alerts" className="scroll-mt-4 rounded-lg border border-white/8 bg-[#0c1724] p-5"><h2 className="font-semibold">Recent alerts</h2><div className="mt-4 divide-y divide-[#e5e9e6]">{data.alerts.length ? data.alerts.map((alert) => <div key={alert.id} className="flex items-center justify-between gap-3 py-3"><div><RiskPill value={alert.risk_level} /><p className="mt-2 text-xs text-slate-400">{displayTime(alert.timestamp)}</p></div><span className="text-right text-xs text-slate-300">{alert.status || 'recorded'}</span></div>) : <p className="p-4 text-sm text-slate-400">No active alerts.</p>}</div></div>

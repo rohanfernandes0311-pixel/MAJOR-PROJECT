@@ -74,13 +74,62 @@ function renderUserLocationLayer(L, map, userLocation, locationStatus) {
   return layer
 }
 
-export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, userLocationStatus = '', simulatedLocation = null, simulatedCitizens = EMPTY_LAYERS, incidentLocation = null, incidentRadiusMeters = 0, incidentMode = false, syntheticZone = null, simulationRoute = null, showSimulationLayers = false, affectedUserLocations = EMPTY_LAYERS, mapContext = null, route = null, risk = 'SAFE', simulation = false, selectedZone = null, selectedZoneRisk = '', selectedZoneDuration = null, recipientLocations = EMPTY_LAYERS, landslideRecords = EMPTY_LAYERS, onRiskAreaSelect = null, simulationSafeZone = null, adminSimulationActor = null }){
+function populateCommunityReportLayer(L, layer, reports, showRejected, verifiedOnly = false) {
+  layer.clearLayers()
+  const colors = { pending: '#eab308', under_review: '#38bdf8', verified: '#22c55e', rejected: '#94a3b8' }
+  reports.forEach((report) => {
+    const status = String(report?.status || 'pending').toLowerCase()
+    if (verifiedOnly && status !== 'verified') return
+    if (status === 'rejected' && !showRejected) return
+    const latitude = Number(report?.latitude)
+    const longitude = Number(report?.longitude)
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
+    const category = String(report?.category || 'other').replaceAll('_', ' ')
+    const marker = verifiedOnly && status === 'verified'
+      ? L.marker([latitude, longitude], {
+        icon: L.divIcon({
+          className: '',
+          html: '<span style="display:flex;width:26px;height:26px;align-items:center;justify-content:center;border:2px solid white;border-radius:50%;background:#087f5b;color:white;font-size:15px;font-weight:700;box-shadow:0 1px 5px #334155">✓</span>',
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        }),
+      }).addTo(layer)
+      : L.circleMarker([latitude, longitude], {
+        radius: status === 'verified' ? 7 : 6,
+        color: '#ffffff', weight: 2,
+        fillColor: colors[status] || colors.pending,
+        fillOpacity: 0.92,
+      }).addTo(layer)
+    marker.bindTooltip(verifiedOnly ? 'Community verified' : `Community report · ${status.replaceAll('_', ' ')}`, { direction: 'top', opacity: 0.95 })
+    const popup = document.createElement('div')
+    const heading = document.createElement('strong')
+    heading.textContent = verifiedOnly ? 'Community verified' : `Community report · ${status.replaceAll('_', ' ')}`
+    const detail = document.createElement('div')
+    detail.textContent = `${category} · ${latitude.toFixed(3)}, ${longitude.toFixed(3)}`
+    popup.append(heading, detail)
+    if (verifiedOnly) {
+      const time = document.createElement('div')
+      const submittedAt = report?.submitted_at ? new Date(report.submitted_at) : null
+      time.textContent = `Reported: ${submittedAt && !Number.isNaN(submittedAt.valueOf()) ? submittedAt.toLocaleString() : 'Date unavailable'}`
+      const source = document.createElement('div')
+      source.textContent = 'Source: Citizen, verified by admin'
+      popup.append(time, source)
+    }
+    marker.bindPopup(popup)
+  })
+}
+
+export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, userLocationStatus = '', simulatedLocation = null, simulatedCitizens = EMPTY_LAYERS, incidentLocation = null, incidentRadiusMeters = 0, incidentMode = false, syntheticZone = null, simulationRoute = null, showSimulationLayers = false, affectedUserLocations = EMPTY_LAYERS, mapContext = null, route = null, risk = 'SAFE', simulation = false, selectedZone = null, selectedZoneRisk = '', selectedZoneDuration = null, recipientLocations = EMPTY_LAYERS, landslideRecords = EMPTY_LAYERS, communityReports = EMPTY_LAYERS, showRejectedCommunityReports = false, showCommunityVerifiedReports = false, onRiskAreaSelect = null, simulationSafeZone = null, adminSimulationActor = null }){
   const ref = useRef()
   const [mapError, setMapError] = useState('')
   const hasCenteredOnUserRef = useRef(false)
   const viewportRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const leafletRef = useRef(null)
+  const communityReportLayerRef = useRef(null)
+  const latestCommunityReportsRef = useRef(communityReports)
+  const showRejectedReportsRef = useRef(showRejectedCommunityReports)
+  const showCommunityVerifiedReportsRef = useRef(showCommunityVerifiedReports)
   const userLocationLayerRef = useRef(null)
   const latestUserLocationRef = useRef(userLocation)
   const latestUserLocationStatusRef = useRef(userLocationStatus)
@@ -89,6 +138,9 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
   // GPS fix without making each GPS update recreate the whole map.
   latestUserLocationRef.current = userLocation
   latestUserLocationStatusRef.current = userLocationStatus
+  latestCommunityReportsRef.current = communityReports
+  showRejectedReportsRef.current = showRejectedCommunityReports
+  showCommunityVerifiedReportsRef.current = showCommunityVerifiedReports
   const hasValidUserLocation = Number.isFinite(Number(userLocation?.lat)) && Number.isFinite(Number(userLocation?.lng))
 
   useEffect(()=>{
@@ -163,6 +215,14 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
         'Dataset-backed landslide inventory': inventoryLayer
       }, { collapsed: true }).addTo(map)
       overlays.push(inventoryLayer, inventoryControl)
+
+      const communityReportLayer = L.layerGroup().addTo(map)
+      communityReportLayerRef.current = communityReportLayer
+      populateCommunityReportLayer(L, communityReportLayer, latestCommunityReportsRef.current, showRejectedReportsRef.current, showCommunityVerifiedReportsRef.current)
+      const reportControl = L.control.layers(null, {
+        [showCommunityVerifiedReportsRef.current ? 'Community verified · separate from official zones' : 'Community reports · separate from official zones']: communityReportLayer,
+      }, { collapsed: true }).addTo(map)
+      overlays.push(communityReportLayer, reportControl)
 
       if (!incidentMode) zones.forEach((feature) => {
         const center = getCenterFromFeature(feature)
@@ -449,9 +509,10 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
       mapInstanceRef.current = null
       leafletRef.current = null
       userLocationLayerRef.current = null
+      communityReportLayerRef.current = null
       overlays.forEach((layer) => layer?.remove?.())
     }
-  }, [zones, simulatedLocation, simulatedCitizens, syntheticZone, simulationRoute, showSimulationLayers, affectedUserLocations, incidentLocation, incidentRadiusMeters, incidentMode, mapContext, route, risk, simulation, selectedZone, selectedZoneRisk, selectedZoneDuration, recipientLocations, onRiskAreaSelect, landslideRecords, simulationSafeZone, adminSimulationActor])
+  }, [zones, simulatedLocation, simulatedCitizens, syntheticZone, simulationRoute, showSimulationLayers, affectedUserLocations, incidentLocation, incidentRadiusMeters, incidentMode, mapContext, route, risk, simulation, selectedZone, selectedZoneRisk, selectedZoneDuration, recipientLocations, landslideRecords, simulationSafeZone, adminSimulationActor])
 
   useEffect(() => {
     const map = mapInstanceRef.current
@@ -469,9 +530,17 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
     }
   }, [userLocation, userLocationStatus])
 
+  useEffect(() => {
+    const map = mapInstanceRef.current
+    const L = leafletRef.current
+    const layer = communityReportLayerRef.current
+    if (!map || !L || !layer) return
+    populateCommunityReportLayer(L, layer, communityReports, showRejectedCommunityReports, showCommunityVerifiedReports)
+  }, [communityReports, showRejectedCommunityReports, showCommunityVerifiedReports])
+
   return <div className="relative h-full w-full">
     {mapError ? <p role="alert" className="absolute inset-0 z-[1000] flex items-center justify-center bg-slate-900 p-6 text-rose-200">{mapError}</p> : null}
-    <div ref={ref} className="h-full w-full" aria-label={simulationSafeZone ? 'Simulation map showing danger zone, saved user locations, simulated Admin actor, evacuation route and safe area' : simulation ? 'Map showing real, simulated citizen, and incident locations separately' : 'Map showing configured risk zones and historical landslide inventory'} />
+    <div ref={ref} className="h-full w-full" aria-label={simulationSafeZone ? 'Simulation map showing danger zone, saved user locations, simulated Admin actor, evacuation route and safe area' : simulation ? 'Map showing real, simulated citizen, and incident locations separately' : 'Map showing configured risk zones, historical landslide inventory, and community reports in a separate layer'} />
     {showSimulationLayers && adminSimulationActor?.status === 'available' ? <div className="simulation-actor-label pointer-events-none absolute left-3 top-3 z-[500] rounded-lg border border-purple-300/40 bg-slate-950/90 px-3 py-2 text-xs text-purple-200"><strong>ADMIN SIMULATION ACTOR</strong><br />Simulation only &bull; Not real GPS</div> : null}
     <div className={`admin-map-legend map-legend pointer-events-none absolute bottom-3 ${simulationSafeZone ? 'right-3' : 'left-3'} z-[500] max-h-[70%] space-y-1 overflow-hidden rounded-lg border border-white/20 bg-slate-950/90 px-3 py-2 text-[10px] text-slate-100 shadow-lg`}>
       <div className="mb-1 font-bold tracking-[0.14em] text-cyan-100">MAP LEGEND</div>
@@ -488,6 +557,8 @@ export default function MapView({ zones = EMPTY_LAYERS, userLocation = null, use
       {route ? <><div><span className="mr-2 inline-block h-0.5 w-4 bg-sky-300 align-middle" />GUIDANCE · Recommended safer route</div><div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-cyan-200" />DESTINATION · User selected</div></> : null}
       {simulatedLocation || simulatedCitizens.length ? <div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-orange-500" />SIMULATED · Demo citizen</div> : null}
       {landslideRecords.length ? <div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-violet-500" />HISTORICAL · Landslide inventory</div> : null}
+      {communityReports.length && showCommunityVerifiedReports ? <><div className="mt-1 border-t border-white/10 pt-1 font-bold text-emerald-200">COMMUNITY VERIFIED · Separate layer</div><div><span className="mr-2 inline-flex h-3 w-3 items-center justify-center rounded-full bg-emerald-700 text-[9px] text-white">✓</span>Approved by admin</div></> : null}
+      {communityReports.length && !showCommunityVerifiedReports ? <><div className="mt-1 border-t border-white/10 pt-1 font-bold text-amber-100">COMMUNITY REPORTS · Separate layer</div><div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-yellow-500" />Pending · unverified</div><div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-sky-400" />Under Review</div><div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-green-500" />Verified</div>{showRejectedCommunityReports ? <div><span className="mr-2 inline-block h-2 w-2 rounded-full bg-slate-400" />Rejected · Admin view</div> : null}</> : null}
     </div>
     {mapContext ? <div className="admin-map-context pointer-events-none absolute right-3 top-3 z-[500] max-w-[220px] rounded-lg border border-cyan-200/30 bg-slate-950/90 px-3 py-2 text-[10px] text-slate-100 shadow-lg"><div className="font-bold tracking-[0.12em] text-cyan-100">SELECTED INTELLIGENCE CONTEXT</div><div className="mt-1 text-xs font-semibold">{mapContext.zoneName}</div><div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1"><span className="text-slate-400">Risk</span><b>{mapContext.risk || 'Unavailable'}</b><span className="text-slate-400">Users inside</span><b>{mapContext.insideUsers ?? 'Unavailable'}</b><span className="text-slate-400">Recipients</span><b>{mapContext.recipientCount ?? 'Unavailable'}</b><span className="text-slate-400">Recent incident</span><b>{mapContext.incidentStatus}</b></div></div> : !simulationSafeZone && !selectedZone && !incidentLocation ? <div className="admin-map-context pointer-events-none absolute right-3 top-3 z-[500] max-w-[210px] rounded-lg border border-white/15 bg-slate-950/85 px-3 py-2 text-xs text-slate-300 shadow-lg">Select a configured zone to view its intelligence context.</div> : null}
     {showSimulationLayers ? <div className="pointer-events-none absolute left-14 top-3 z-[500] rounded-lg border border-amber-200/40 bg-amber-500/90 px-2.5 py-1 text-xs font-bold tracking-wide text-slate-950 shadow-lg">⚠ SIMULATION MODE — DEMONSTRATION ONLY</div> : simulation ? <div className="pointer-events-none absolute left-14 top-3 z-[500] rounded-lg border border-amber-200/40 bg-amber-500/90 px-2.5 py-1 text-xs font-bold tracking-wide text-slate-950 shadow-lg">SIMULATION</div> : null}

@@ -84,12 +84,13 @@ test('map keeps real GPS, simulated citizens, incident marker, and affected area
   assert.doesNotMatch(citizen, /setLocation\(.*demoAlert/)
 })
 
-test('citizen demo inbox is human-readable and hides technical status wording', async () => {
+test('noncitizen Public alert inbox remains human-readable and hides delivery internals', async () => {
   const source = await readFile(new URL('../pages/Public.jsx', import.meta.url), 'utf8')
-  assert.match(source, /🚨 LANDSLIDE ALERT/)
-  assert.match(source, /SIMULATION — NOT A LIVE ALERT/)
-  assert.match(source, /safety_guidance/)
-  assert.doesNotMatch(source, /Synthetic rainfall estimate — not live provider data/)
+  assert.match(source, /\{!isCitizen \? \(\s*<section ref=\{alertsRef\}/)
+  assert.match(source, /LANDSLIDE ALERT/)
+  assert.match(source, /SIMULATION.*NOT A LIVE ALERT/)
+  assert.match(source, /demoAlert\.safety_guidance/)
+  assert.doesNotMatch(source, /Synthetic rainfall estimate/)
   assert.doesNotMatch(source, /Live weather data from/)
   assert.doesNotMatch(source, /alert\.delivery_status/)
 })
