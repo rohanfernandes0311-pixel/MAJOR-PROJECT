@@ -1,4 +1,6 @@
-from sqlalchemy import Float, Integer, String, Text, UniqueConstraint, text
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .connection import Base
@@ -432,3 +434,38 @@ class UserSession(Base):
         String,
         nullable=True
     )
+
+
+# =========================================================
+# COMMUNITY HAZARD REPORTS (separate from official inventory/zones)
+# =========================================================
+
+class CommunityReport(Base):
+    __tablename__ = "community_reports"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    reporter_uid: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    reporter_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    reporter_role: Mapped[str | None] = mapped_column(String(16), nullable=True, server_default=text("'citizen'"))
+    category: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    place_name: Mapped[str | None] = mapped_column(String(250), nullable=True)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"), index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'pending'"), index=True)
+    reviewed_by_uid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CommunityReportReview(Base):
+    __tablename__ = "community_report_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    report_id: Mapped[str] = mapped_column(String(36), ForeignKey("community_reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    actor_uid: Mapped[str] = mapped_column(String(255), nullable=False)
+    actor_role: Mapped[str] = mapped_column(String(16), nullable=False)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"), index=True)
