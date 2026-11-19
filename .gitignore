@@ -32,3 +32,4 @@ data/landslide_extraction/*/
 *.hdf5
 *.nc
 alerts/*.jsonl
+alerts/simulation_events.jsonl
