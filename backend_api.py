@@ -911,7 +911,7 @@ def submit_community_report(
     place_name = req.place_name.strip() if req.place_name is not None else None
     if req.place_name is not None and not place_name:
         raise HTTPException(status_code=422, detail="Place name must not be blank")
-    if place_name and not (11.5 <= req.latitude <= 18.5 and 74.0 <= req.longitude <= 78.6):
+    if not (11.5 <= req.latitude <= 18.5 and 74.0 <= req.longitude <= 78.6):
         raise HTTPException(status_code=422, detail="Report location must be within Karnataka, India")
 
     now = datetime.now(timezone.utc)
