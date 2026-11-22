@@ -2,10 +2,14 @@ config/firebase-service-account.json
 
 __pycache__/
 *.pyc
+.venv/
 
 web-ui/node_modules/
 web-ui/dist/
 web-ui/node-compile-cache/
+htmlcov/
+.coverage
+.coverage.*
 
 .env
 .vscode/
@@ -24,6 +28,12 @@ _netrc
 *.db-*
 *.sqlite*
 *.log
+logs/
+uploads/
+exports/
+user_exports/
+*.xlsx
+*.xls
 .pytest_cache/
 
 # Generated investigation artifacts; retain tracked historical files
