@@ -1361,7 +1361,7 @@ focus_df = df_pred[df_pred["risk_label"] == current_risk]
 if focus_df.empty:
     focus_df = df_pred.nlargest(max(1, len(df_pred) // 10), "confidence")
 
-critical_pixel_id = int(np.nanargmax(df_pred["deformation_mm"].to_numpy())) % disp.shape[0]
+critical_pixel_id = int(df_pred["deformation_mm"].idxmax()) % disp.shape[0]
 ivm = inverse_velocity_method(disp[critical_pixel_id], dt_days=12.0, window=5, project_steps=15)
 
 summary = {
