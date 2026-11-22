@@ -146,6 +146,16 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(self), camera=(), microphone=()")
+    return response
+
 def _web_ui_asset(path: str, media_type: str | None = None) -> FileResponse:
     target = WEB_UI_DIST_DIR / path
     if not target.exists():

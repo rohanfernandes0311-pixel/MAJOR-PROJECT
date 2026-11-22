@@ -34,6 +34,19 @@ class CorsConfigurationTests(unittest.TestCase):
         }
         self.assertEqual(cors_headers, set())
 
+    def test_security_headers_are_set_on_responses(self):
+        response = self.client.get("/health")
+
+        self.assertEqual(response.headers.get("x-content-type-options"), "nosniff")
+        self.assertEqual(response.headers.get("x-frame-options"), "DENY")
+        self.assertEqual(
+            response.headers.get("referrer-policy"), "strict-origin-when-cross-origin"
+        )
+        self.assertEqual(
+            response.headers.get("permissions-policy"),
+            "geolocation=(self), camera=(), microphone=()",
+        )
+
     def test_wildcard_origin_is_rejected(self):
         with patch.dict("os.environ", {"CORS_ALLOWED_ORIGINS": "*"}):
             with self.assertRaises(RuntimeError):
