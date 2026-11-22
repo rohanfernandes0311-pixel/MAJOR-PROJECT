@@ -87,6 +87,13 @@ class CommunityReportsAuditTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertIn("within Karnataka", response.json()["detail"])
 
+    def test_report_without_place_name_cannot_bypass_karnataka_bounds(self):
+        body = {**self.body, "latitude": 19.0}
+        body.pop("place_name")
+        response = self.client.post("/community-reports", headers=self.headers, json=body)
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("within Karnataka", response.json()["detail"])
+
     def test_anonymous_cannot_review_reports(self):
         response = self.client.post(
             "/admin/community-reports/unknown/review", json={"status": "verified"},

@@ -144,9 +144,9 @@ class CommunityReportHttpTests(unittest.TestCase):
         self.assertEqual(self.submit().status_code, 201)
         self.assertEqual(self.submit().status_code, 409)
         for index in range(4):
-            response = self.submit(category="rockfall", latitude=10 + index, longitude=70 + index)
+            response = self.submit(category="rockfall", latitude=12.5 + (index * 0.1), longitude=75.3 + (index * 0.1))
             self.assertEqual(response.status_code, 201)
-        self.assertEqual(self.submit(category="other", latitude=50, longitude=50).status_code, 429)
+        self.assertEqual(self.submit(category="other", latitude=13.5, longitude=76).status_code, 429)
 
 
 if __name__ == "__main__":
