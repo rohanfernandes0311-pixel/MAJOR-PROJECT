@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import MapView from '../shared/MapView'
 import RiskCard from '../shared/RiskCard'
 import { CitizenCommunityReports } from '../components/CommunityReports'
@@ -19,8 +19,9 @@ import { createCitizenEnvironmentController } from '../services/citizenEnvironme
 import SoilMoistureCard from '../shared/SoilMoistureCard'
 import { createCitizenPrecipitationController } from '../services/citizenPrecipitation'
 import PrecipitationCard from '../shared/PrecipitationCard'
-import RainfallDashboard from '../components/RainfallDashboard'
 import LandSenseLayout from '../components/LandSenseLayout'
+
+const RainfallDashboard = lazy(() => import('../components/RainfallDashboard'))
 
 const SHOW_CITIZEN_MODEL_EXPLANATION = false
 const SHOW_CITIZEN_RAINFALL_CONTEXT = false
@@ -1053,7 +1054,11 @@ export default function Public() {
                   </div>
                 </section>
 
-                {!isCitizen || SHOW_CITIZEN_RAINFALL_CONTEXT ? <RainfallDashboard trends={rainfallTrends} forecast={rainfallForecast} loading={rainfallLoading} error={rainfallError} period={rainfallPeriod} onPeriodChange={setRainfallPeriod} days={rainfallDays} onDaysChange={setRainfallDays} /> : null}
+                {!isCitizen || SHOW_CITIZEN_RAINFALL_CONTEXT ? (
+                  <Suspense fallback={<section aria-label="Rainfall context" aria-busy="true" className="citizen-trend min-h-[40rem] border border-[#dfe5df] bg-white p-4"><p role="status" className="text-sm text-slate-600">Loading rainfall context…</p></section>}>
+                    <RainfallDashboard trends={rainfallTrends} forecast={rainfallForecast} loading={rainfallLoading} error={rainfallError} period={rainfallPeriod} onPeriodChange={setRainfallPeriod} days={rainfallDays} onDaysChange={setRainfallDays} />
+                  </Suspense>
+                ) : null}
 
                 <section ref={alertControlsRef} id={isCitizen ? 'targeted-alerts' : undefined} className="citizen-controls border border-[#dfe5df] bg-white p-4">
                   <div className="mb-3">
