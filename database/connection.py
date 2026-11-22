@@ -38,6 +38,7 @@ if not DATABASE_URL.startswith("postgresql+"):
 engine = create_engine(
     DATABASE_URL,
     connect_args=connect_args,
+    hide_parameters=True,
     pool_pre_ping=True,
     pool_recycle=300,
     pool_size=5,
@@ -91,6 +92,7 @@ MIGRATION_DATABASE_URL = "sqlite:///./data/landsense_unified.db"
 migration_engine = create_engine(
     MIGRATION_DATABASE_URL,
     connect_args={"check_same_thread": False},
+    hide_parameters=True,
     pool_pre_ping=True,
 )
 

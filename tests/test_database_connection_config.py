@@ -11,6 +11,7 @@ class DatabaseConnectionConfigTests(unittest.TestCase):
         self.assertIn("-pooler", engine.url.host or "")
 
         self.assertTrue(engine.pool._pre_ping)
+        self.assertTrue(engine.hide_parameters)
         self.assertEqual(engine.pool._recycle, 300)
         self.assertEqual(engine.pool.size(), 5)
         self.assertEqual(engine.pool._max_overflow, 10)
