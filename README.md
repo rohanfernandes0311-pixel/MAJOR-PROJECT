@@ -43,7 +43,7 @@ npm install
 npm run dev
 ```
 
-The Vite development proxy targets `http://127.0.0.1:8000` unless `VITE_API_BASE_URL` overrides it. To create a production frontend bundle, run `npm run build` in `web-ui`.
+The Vite development proxy targets `http://127.0.0.1:8000` unless `VITE_API_BASE_URL` overrides it. Production browser API calls use the frontend origin, so configure the production host or reverse proxy to forward API paths to the backend. To create a production frontend bundle, run `npm run build` in `web-ui`.
 
 ### Database migration
 
